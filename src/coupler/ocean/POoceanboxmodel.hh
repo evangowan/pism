@@ -29,42 +29,37 @@ namespace ocean {
 //! A class defining the interface of a PISM ocean model modifier.
 
 //! \brief A class implementing an ocean model.
-//! Computes the subshelf melt/refreezing rate based on a simple ocean box model by Olbers & Hellmer (2010).
+//! Computes the subshelf melt/refreezing rate based on a simple ocean box model
+//by Olbers & Hellmer (2010).
 
-class BoxModel : public PGivenClimate<POModifier,PISMOceanModel>
-{
+class BoxModel : public PGivenClimate<POModifier, PISMOceanModel> {
 public:
   BoxModel(IceGrid::ConstPtr g);
   virtual ~BoxModel();
 
-  virtual void add_vars_to_output(std::string keyword, std::set<std::string> &result); 
+  virtual void add_vars_to_output(std::string keyword,
+                                  std::set<std::string> &result);
 
   virtual void define_variables(std::set<std::string> vars, const PIO &nc,
                                 PISM_IO_Type nctype);
 
-  virtual void write_variables(std::set<std::string> vars, const PIO& nc);
-
-  //////////////////////////////////////////////////////////////////////////////////////////
-
+  virtual void write_variables(std::set<std::string> vars, const PIO &nc);
 
   class POBMConstants {
   public:
     POBMConstants(const PISMConfig &config);
 
-    double        earth_grav,
-      rhoi, rhow, rho_star, nu,
-      latentHeat, c_p_ocean, lambda,
-      a, b, c,
-      alpha, beta;
+    double earth_grav, rhoi, rhow, rho_star, nu, latentHeat, c_p_ocean, lambda,
+        a, b, c, alpha, beta;
 
-    double        gamma_T, value_C,
-      T_dummy, S_dummy;
+    double gamma_T, value_C, T_dummy, S_dummy;
 
-    double        gamma_T_o, meltFactor, meltSalinity, b2;
-    double        continental_shelf_depth;
+    double gamma_T_o, meltFactor, meltSalinity, b2;
+    double continental_shelf_depth;
 
-    int      numberOfBasins;
+    int numberOfBasins;
   };
+
 protected:
   virtual void shelf_base_mass_flux_impl(IceModelVec2S &result);
   virtual void melange_back_pressure_fraction_impl(IceModelVec2S &result);
@@ -72,20 +67,15 @@ protected:
   virtual void sea_level_elevation_impl(double &result);
   virtual void update_impl(double t, double dt);
   virtual void init_impl();
+
 private:
+  IceModelVec2S shelfbtemp, shelfbmassflux;
 
-  IceModelVec2S   shelfbtemp, 
-    shelfbmassflux;
+  IceModelVec2T *theta_ocean, *salinity_ocean;
 
-  IceModelVec2T   *theta_ocean, 
-    *salinity_ocean;
+  IceModelVec2S *ice_thickness, *topg, *basins; // not owned by this class
 
-  IceModelVec2S   *ice_thickness, 
-    *topg,
-    *basins;  // not owned by this class
-
-  IceModelVec2Int *mask;  // not owned by this class
-
+  IceModelVec2Int *mask; // not owned by this class
 
   virtual void initBasinsOptions(const POBMConstants &constants);
   virtual void roundBasins();
@@ -100,72 +90,37 @@ private:
   virtual void basalMeltRateForIceFrontBox(const POBMConstants &constants);
   virtual void basalMeltRateForOtherShelves(const POBMConstants &constants);
 
-
-
-  static const int  box_unidentified, 
-    box_noshelf,
-    box_GL,
-    box_neighboring,
-    box_IF,
-    box_other,
-
-    maskfloating,
-    maskocean,
-    maskgrounded,
-
-    imask_inner,
-    imask_outer,
-    imask_exclude,
-    imask_unidentified;
+  static const int box_unidentified, box_noshelf, box_GL, box_neighboring,
+      box_IF, box_other,
+      maskfloating, maskocean, maskgrounded,
+      imask_inner, imask_outer, imask_exclude, imask_unidentified;
 
   double counter_box_unidentified;
 
-  std::vector<double> Toc_base_vec,
-    Soc_base_vec,
-    gamma_T_star_vec,
-    C_vec,
+  std::vector<double> Toc_base_vec, Soc_base_vec, gamma_T_star_vec, C_vec,
 
-    mean_salinity_GLbox_vector,
-    mean_meltrate_GLbox_vector,
-    mean_overturning_GLbox_vector,
+      mean_salinity_GLbox_vector, mean_meltrate_GLbox_vector,
+      mean_overturning_GLbox_vector,
 
-    counter,
-    counter_GLbox,
-    counter_CFbox;
-  //k_basins;
+      counter, counter_GLbox, counter_CFbox;
 
-  IceModelVec2S ICERISESmask, 
-    BOXMODELmask,
-    OCEANMEANmask, //FIXME delete OCEANMEANmask
-    CHECKmask, //FIXME delete CHECKmask
-    Soc,
-    Soc_base,
-    Toc,
-    Toc_base,
-    Toc_inCelsius,
-    T_star,
-    Toc_anomaly,
-    overturning,
-    heatflux,
-    basalmeltrate_shelf;
+  IceModelVec2S ICERISESmask, BOXMODELmask,
+      OCEANMEANmask, // FIXME delete OCEANMEANmask
+      CHECKmask, // FIXME delete CHECKmask
+      Soc, Soc_base, Toc, Toc_base, Toc_inCelsius, T_star, Toc_anomaly,
+      overturning, heatflux, basalmeltrate_shelf;
 
-  double        gamma_T, value_C,
-    T_dummy, S_dummy,
-    continental_shelf_depth;
+  double gamma_T, value_C, T_dummy, S_dummy, continental_shelf_depth;
 
-  int      numberOfBasins;
+  int numberOfBasins;
 
 protected:
-
   Timeseries *delta_T;
   double delta_T_factor;
   double temp_anomaly;
 
-
-  bool  ocean_oceanboxmodel_deltaT_set, 
-    exicerises_set,
-    roundbasins_set,
-    continental_shelf_depth_set;
+  bool ocean_oceanboxmodel_deltaT_set, exicerises_set, roundbasins_set,
+      continental_shelf_depth_set;
 };
 
 } // end of namespace ocean
