@@ -41,8 +41,14 @@ netcdf pism_config {
     pism_config:stress_balance_model_type = "keyword";
     pism_config:stress_balance_model_option = "stress_balance";
     pism_config:stress_balance_model_choices = "none,prescribed_sliding,sia,ssa,prescribed_sliding+sia,ssa+sia";
-    pism_config:stress_balance_model = "sia_only";
+    pism_config:stress_balance_model = "sia";
     pism_config:stress_balance_model_doc = "stress balance model; choose from 'none', 'sia', 'ssa', 'ssa+sia', 'prescribed_sliding', 'prescribed_sliding+sia'";
+
+    pism_config:stress_balance_vertical_velocity_approximation_type = "keyword";
+    pism_config:stress_balance_vertical_velocity_approximation_option = "vertical_velocity_approximation";
+    pism_config:stress_balance_vertical_velocity_approximation_choices = "centered,upstream";
+    pism_config:stress_balance_vertical_velocity_approximation = "centered";
+    pism_config:stress_balance_vertical_velocity_approximation_doc = "Vertical velocity FD approximation: 'centered' or 'upstream'. \"Upstream\" uses first-order finite difference to compute u_x and v_y. Uses basal velocity to make decisions.";
 
     pism_config:do_skip_type = "boolean";
     pism_config:do_skip_option = "skip";
@@ -108,6 +114,10 @@ netcdf pism_config {
     pism_config:calving_methods = "";
     pism_config:calving_methods_doc = "comma-separated list of calving methods; one or more of 'eigen_calving', 'ocean_kill', 'float_kill', 'thickness_calving'";
 
+    pism_config:float_kill_margin_only_type = "boolean";
+    pism_config:float_kill_margin_only = "no";
+    pism_config:float_kill_margin_only_doc = "Apply float_kill at ice margin cells only.";
+
     pism_config:do_fracture_density_type = "boolean";
     pism_config:do_fracture_density_option = "fractures";
     pism_config:do_fracture_density = "no";
@@ -139,11 +149,6 @@ netcdf pism_config {
     pism_config:is_dry_simulation_option = "dry";
     pism_config:is_dry_simulation = "no";
     pism_config:is_dry_simulation_doc = "Dry (ocean-less) simulation; ice is considered grounded regardless of ice thickness, bed elevation, and sea level.";
-
-    pism_config:stress_balance_model_type = "keyword";
-    pism_config:stress_balance_model_choices = "none,prescribed_sliding,sia,ssa,prescribed_sliding+sia,ssa+sia";    
-    pism_config:stress_balance_model = "sia";
-    pism_config:stress_balance_model_doc = "the stress balance model";
 
     pism_config:write_ssa_system_to_matlab_type = "boolean";
     pism_config:write_ssa_system_to_matlab = "no";
@@ -490,6 +495,20 @@ netcdf pism_config {
     pism_config:hydrology_maximum_time_step_years = 1.0;
     pism_config:hydrology_maximum_time_step_years_doc = "maximum allowed time step length used by PISMRoutingHydrology and PISMDistributedHydrology";
 
+    pism_config:hydrology_null_diffuse_till_water_type = "boolean";
+    pism_config:hydrology_null_diffuse_till_water = "no";
+    pism_config:hydrology_null_diffuse_till_water_doc = "Diffuse stored till water laterally. See equation (11) of [@ref BBssasliding]"; 
+
+    pism_config:hydrology_null_diffusion_time_units = "years";
+    pism_config:hydrology_null_diffusion_time_type = "scalar";
+    pism_config:hydrology_null_diffusion_time = 1000.0;
+    pism_config:hydrology_null_diffusion_time_doc = "diffusion time for till water thickness; see equation (11) in [@ref BBssasliding]; only active if hydrology_null_diffuse_till_water is set";
+
+    pism_config:hydrology_null_diffusion_distance_units = "meters";
+    pism_config:hydrology_null_diffusion_distance_type = "scalar";
+    pism_config:hydrology_null_diffusion_distance = 2e4;
+    pism_config:hydrology_null_diffusion_distance_doc = "diffusion distance for till water thickness; see equation (11) in [@ref BBssasliding]; only active if hydrology_null_diffuse_till_water is set";
+
     pism_config:hydrology_null_strip_width_units = "meters";
     pism_config:hydrology_null_strip_width_type = "scalar";
     pism_config:hydrology_null_strip_width = -1.0;
@@ -583,11 +602,15 @@ netcdf pism_config {
     pism_config:bed_smoother_range = 5.0e3;
     pism_config:bed_smoother_range_doc = "half-width of smoothing domain for PISMBedSmoother, in implementing [@ref Schoofbasaltopg2003] bed roughness parameterization for SIA; set value to zero to turn off mechanism";
 
-    pism_config:max_iterations_ssafd_option = "ssa_maxi";
-    pism_config:max_iterations_ssafd_units = "count";
-    pism_config:max_iterations_ssafd_type = "integer";
-    pism_config:max_iterations_ssafd = 300;
-    pism_config:max_iterations_ssafd_doc = "Maximum number of iterations for the ice viscosity computation, in the SSAFD object";
+    pism_config:ssafd_max_iterations_option = "ssa_maxi";
+    pism_config:ssafd_max_iterations_units = "count";
+    pism_config:ssafd_max_iterations_type = "integer";
+    pism_config:ssafd_max_iterations = 300;
+    pism_config:ssafd_max_iterations_doc = "Maximum number of iterations for the ice viscosity computation, in the SSAFD object";
+
+    pism_config:ssafd_replace_zero_diagonal_entries_type = "boolean";
+    pism_config:ssafd_replace_zero_diagonal_entries = "yes";
+    pism_config:ssafd_replace_zero_diagonal_entries_doc = "Replace zero diagonal entries in the SSAFD matrix with beta_ice_free_bedrock to avoid solver failures.";
 
     pism_config:global_min_allowed_temp_option = "low_temp";
     pism_config:global_min_allowed_temp_units = "Kelvin";
@@ -1252,6 +1275,16 @@ netcdf pism_config {
     pism_config:mask_icefree_thickness_standard_type = "scalar";
     pism_config:mask_icefree_thickness_standard = 0.01;
     pism_config:mask_icefree_thickness_standard_doc = "If ice is thinner than this standard then the mask is set to MASK_ICE_FREE_BEDROCK or MASK_ICE_FREE_OCEAN.";
+
+    pism_config:mask_icefree_thickness_reporting_standard_units = "meters";
+    pism_config:mask_icefree_thickness_reporting_standard_type = "scalar";
+    pism_config:mask_icefree_thickness_reporting_standard = 10.0;
+    pism_config:mask_icefree_thickness_reporting_standard_doc = "If ice is thinner than this standard then the mask is set to MASK_ICE_FREE_BEDROCK or MASK_ICE_FREE_OCEAN for purposes of reporting glacierized area, volume, etc.";
+
+    pism_config:mask_icefree_thickness_stress_balance_standard_units = "meters";
+    pism_config:mask_icefree_thickness_stress_balance_standard_type = "scalar";
+    pism_config:mask_icefree_thickness_stress_balance_standard = 10.0;
+    pism_config:mask_icefree_thickness_stress_balance_standard_doc = "If ice is thinner than this standard then the mask is set to MASK_ICE_FREE_BEDROCK or MASK_ICE_FREE_OCEAN for purposes of computing ice velocity distribution.";
 
     pism_config:mask_is_floating_thickness_standard_units = "meters";
     pism_config:mask_is_floating_thickness_standard_type = "scalar";
