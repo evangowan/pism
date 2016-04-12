@@ -115,11 +115,12 @@ private:
   int numberOfBasins;
 
 protected:
+  std::vector<IceModelVec*> m_variables;
   Timeseries *delta_T;
   double delta_T_factor;
   double temp_anomaly;
 
-  bool ocean_oceanboxmodel_deltaT_set, exicerises_set, roundbasins_set,
+  bool ocean_oceanboxmodel_deltaT_set, exicerises_set,
       continental_shelf_depth_set;
 };
 

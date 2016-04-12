@@ -17,9 +17,9 @@
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "POoceanboxmodel.hh"
-#include "base/util/PISMVars.hh"
 #include "base/util/IceGrid.hh"
 #include "base/util/PISMConfig.hh"
+#include "base/util/PISMVars.hh"
 
 namespace pism {
 namespace ocean {
@@ -43,31 +43,31 @@ BoxModel::POBMConstants::POBMConstants(const PISMConfig &config) {
   rhoi       = config.get("ice_density");
   rhow       = config.get("sea_water_density");
   rho_star   = 1033;            // kg/m^3
-  nu          = rhoi / rho_star; // no unit
+  nu         = rhoi / rho_star; // no unit
 
   latentHeat = config.get("water_latent_heat_fusion");
-  c_p_ocean  = 3974.0;          // J/(K*kg), specific heat capacity of ocean mixed layer
-  lambda          = latentHeat / c_p_ocean; // °C, NOTE K vs °C
+  c_p_ocean  = 3974.0;                 // J/(Kelvin*kg), specific heat capacity of ocean mixed layer
+  lambda     = latentHeat / c_p_ocean; // Celsius, NOTE Kelvin vs Celsius
 
-  a = -0.057;  // °C/psu
-  b = 0.0832;  // °C
-  c = 7.64e-4; // °C/dbar
+  a = -0.057;  // Celsius/psu
+  b = 0.0832;  // Celsius
+  c = 7.64e-4; // Celsius/dbar
 
-  alpha = 7.5e-5; // 1/°C, NOTE K vs °C
-  beta = 7.7e-4;  // 1/psu
+  alpha = 7.5e-5; // 1/Celsius, NOTE Kelvin vs Celsius
+  beta  = 7.7e-4; // 1/psu
 
   gamma_T = 1e-6;
   value_C = 5e6;
 
   // other ice shelves
   gamma_T_o    = 1.0e-4;
-  meltFactor   = 0.002;         // FIXME!!!! (Wrong value!) FIXME config
+  meltFactor   = 0.002; // FIXME!!!! (Wrong value!) FIXME config
   meltSalinity = 35.0;
   b2           = 0.0939;
 }
 
 const int BoxModel::box_unidentified = -99; // This should never show up in the .nc-files.
-const int BoxModel::box_neighboring  = -1; // This should never show up in the .nc-files.
+const int BoxModel::box_neighboring  = -1;  // This should never show up in the .nc-files.
 const int BoxModel::box_noshelf      = 0;
 const int BoxModel::box_GL           = 1; // ocean box covering the grounding line region
 const int BoxModel::box_IF           = 2; // ocean box covering the rest of the ice shelf
@@ -82,15 +82,14 @@ const int BoxModel::imask_outer        = 0;
 const int BoxModel::imask_exclude      = 1;
 const int BoxModel::imask_unidentified = -1;
 
-BoxModel::BoxModel(IceGrid &g, const PISMConfig &conf)
-  : PGivenClimate<POModifier, OceanModel>(g, conf, NULL) {
+BoxModel::BoxModel(IceGrid &g, const PISMConfig &conf) : PGivenClimate<POModifier, OceanModel>(g, conf, NULL) {
   option_prefix = "-ocean_oceanboxmodel";
 
   // will be de-allocated by the parent's destructor
-  theta_ocean = new IceModelVec2T;
+  theta_ocean    = new IceModelVec2T;
   salinity_ocean = new IceModelVec2T;
 
-  m_fields["theta_ocean"] = theta_ocean;
+  m_fields["theta_ocean"]    = theta_ocean;
   m_fields["salinity_ocean"] = salinity_ocean;
 
   process_options();
@@ -99,126 +98,118 @@ BoxModel::BoxModel(IceGrid &g, const PISMConfig &conf)
   set_vec_parameters(standard_names);
 
   theta_ocean->create(grid, "theta_ocean");
-  theta_ocean->set_attrs("climate_forcing",
-                         "absolute potential temperature of the adjacent ocean",
-                         "Kelvin", "");
+  theta_ocean->set_attrs("climate_forcing", "absolute potential temperature of the adjacent ocean", "Kelvin", "");
 
   salinity_ocean->create(grid, "salinity_ocean");
-  salinity_ocean->set_attrs("climate_forcing", "salinity of the adjacent ocean",
-                            "g/kg", "");
+  salinity_ocean->set_attrs("climate_forcing", "salinity of the adjacent ocean", "g/kg", "");
 
   shelfbtemp.create(grid, "shelfbtemp", WITHOUT_GHOSTS);
-  shelfbtemp.set_attrs("climate_forcing",
-                       "absolute temperature at ice shelf base", "Kelvin", "");
+  shelfbtemp.set_attrs("climate_forcing", "absolute temperature at ice shelf base", "Kelvin", "");
+  m_variables.push_back(&shelfbtemp);
 
   shelfbmassflux.create(grid, "shelfbmassflux", WITHOUT_GHOSTS);
-  shelfbmassflux.set_attrs("climate_forcing", "ice mass flux from ice shelf "
-                           "base (positive flux is loss "
-                           "from ice shelf)",
-                           "kg m-2 s-1", "");
+  shelfbmassflux.set_attrs(
+      "climate_forcing", "ice mass flux from ice shelf base (positive flux is loss from ice shelf)", "kg m-2 s-1", "");
   shelfbmassflux.set_glaciological_units("kg m-2 year-1");
   shelfbmassflux.write_in_glaciological_units = true;
-
+  m_variables.push_back(&shelfbmassflux);
   //////////////////////////////////////////////////////////////////////////
 
   // mask to identify the ocean boxes
   BOXMODELmask.create(grid, "BOXMODELmask", WITH_GHOSTS);
-  BOXMODELmask.set_attrs("model_state", "mask displaying ocean box model grid",
-                         "", "");
+  BOXMODELmask.set_attrs("model_state", "mask displaying ocean box model grid", "", "");
+  m_variables.push_back(&BOXMODELmask);
 
   // mask to identify the grounded ice rises
   ICERISESmask.create(grid, "ICERISESmask", WITH_GHOSTS);
   ICERISESmask.set_attrs("model_state", "mask displaying ice rises", "", "");
-  PISMOptionsIsSet("-exclude_icerises", exicerises_set);
+  m_variables.push_back(&ICERISESmask);
+
+  exicerises_set = options::Bool("-exclude_icerises", "FIXME: add description");
 
   // mask displaying continental shelf - region where mean salinity and ocean
   // temperature is calculated
   OCEANMEANmask.create(grid, "OCEANMEANmask", WITH_GHOSTS);
-  OCEANMEANmask.set_attrs("model_state",
-                          "mask displaying ocean region for parameter input",
-                          "", "");
+  OCEANMEANmask.set_attrs("model_state", "mask displaying ocean region for parameter input", "", "");
+  m_variables.push_back(&OCEANMEANmask);
 
   // salinity
   Soc.create(grid, "Soc", WITHOUT_GHOSTS);
-  Soc.set_attrs("model_state", "ocean salinity field", "",
-                "ocean salinity field"); // NOTE unit=psu
+  Soc.set_attrs("model_state", "ocean salinity field", "", "ocean salinity field"); // NOTE unit=psu
+  m_variables.push_back(&Soc);
 
   Soc_base.create(grid, "Soc_base", WITHOUT_GHOSTS);
-  Soc_base.set_attrs("model_state", "ocean base salinity field", "",
-                     "ocean base salinity field"); // NOTE unit=psu
+  Soc_base.set_attrs("model_state", "ocean base salinity field", "", "ocean base salinity field"); // NOTE unit=psu
+  m_variables.push_back(&Soc_base);
 
   // temperature
   Toc.create(grid, "Toc", WITHOUT_GHOSTS);
-  Toc.set_attrs("model_state", "ocean temperature field", "K",
-                "ocean temperature field");
+  Toc.set_attrs("model_state", "ocean temperature field", "Kelvin", "ocean temperature field");
+  m_variables.push_back(&Toc);
 
   Toc_base.create(grid, "Toc_base", WITHOUT_GHOSTS);
-  Toc_base.set_attrs("model_state", "ocean base temperature", "K",
-                     "ocean base temperature");
+  Toc_base.set_attrs("model_state", "ocean base temperature", "Kelvin", "ocean base temperature");
+  m_variables.push_back(&Toc_base);
 
   Toc_inCelsius.create(grid, "Toc_inCelsius", WITHOUT_GHOSTS);
-  Toc_inCelsius.set_attrs("model_state", "ocean box model temperature field",
-                          "degree C", "ocean box model temperature field");
+  Toc_inCelsius.set_attrs("model_state", "ocean box model temperature field", "degree C",
+                          "ocean box model temperature field");
+  m_variables.push_back(&Toc_inCelsius);
 
   T_star.create(grid, "T_star", WITHOUT_GHOSTS);
   T_star.set_attrs("model_state", "T_star field", "degree C", "T_star field");
+  m_variables.push_back(&T_star);
 
   Toc_anomaly.create(grid, "Toc_anomaly", WITHOUT_GHOSTS);
-  Toc_anomaly.set_attrs("model_state", "ocean temperature anomaly", "K",
-                        "ocean temperature anomaly");
+  Toc_anomaly.set_attrs("model_state", "ocean temperature anomaly", "Kelvin", "ocean temperature anomaly");
+  m_variables.push_back(&Toc_anomaly);
 
   // overturning rate
   overturning.create(grid, "overturning", WITHOUT_GHOSTS);
-  overturning.set_attrs("model_state", "cavity overturning", "m^3 s-1",
-                        "cavity overturning"); // no CF standard_name ??
+  overturning.set_attrs("model_state", "cavity overturning", "m^3 s-1", "cavity overturning");
+  m_variables.push_back(&overturning);
 
   // heat flux
   heatflux.create(grid, "ocean heat flux", WITHOUT_GHOSTS);
   heatflux.set_attrs("climate_state", "ocean heat flux", "W/m^2", "");
+  m_variables.push_back(&heatflux);
 
   // basal melt rate
-  basalmeltrate_shelf.create(grid, "basal melt rate from ocean box model",
-                             WITHOUT_GHOSTS);
+  basalmeltrate_shelf.create(grid, "basal melt rate from ocean box model", WITHOUT_GHOSTS);
   basalmeltrate_shelf.set_attrs("climate_state", "basal melt rate from ocean box model", "m/s", "");
   basalmeltrate_shelf.set_glaciological_units("m year-1");
   basalmeltrate_shelf.write_in_glaciological_units = true;
+  m_variables.push_back(&basalmeltrate_shelf);
 
   ///////// forcing
   ////////////////////////////////////////////////////////////////////////////////////
 
   // option for scalar forcing of ocean temperature
-  PISMOptionsIsSet("-ocean_obm_deltaT", ocean_oceanboxmodel_deltaT_set);
+  ocean_oceanboxmodel_deltaT_set = options::Bool("-ocean_obm_deltaT", "FIXME: add description");
 
   if (ocean_oceanboxmodel_deltaT_set) {
-    bool delta_T_set;
     std::string delta_T_file;
 
-    PISMOptionsString("-ocean_obm_deltaT", "Specifies the ocean temperature "
-                      "offsets file to use with "
-                      "-ocean_obm_deltaT",
-                      delta_T_file, delta_T_set);
+    options::String delta_T_file("-ocean_obm_deltaT",
+                                 "Specifies the ocean temperature offsets file to use with -ocean_obm_deltaT");
 
-    m_log->message(2, "  reading delta_T data from forcing file %s for "
-                   "-ocean_obm_deltaT actions ...\n",
+    m_log->message(2, "  reading delta_T data from forcing file %s for -ocean_obm_deltaT actions ...\n",
                    delta_T_file.c_str());
 
-    delta_T = new Timeseries(&grid, "delta_T",
-                             grid.config.get_string("time_dimension_name"));
+    delta_T = new Timeseries(&grid, "delta_T", grid.config.get_string("time_dimension_name"));
     delta_T->set_units("Kelvin", "");
     delta_T->set_dimension_units(grid.time->units_string(), "");
     delta_T->set_attr("long_name", "ocean temperature offsets");
     // delta_T->read(delta_T_file, grid.time->use_reference_date());
 
-    PIO nc(grid.com, "netcdf3", grid.get_unit_system());
-    nc.open(delta_T_file, PISM_NOWRITE);
-    { delta_T->read(nc, grid.time); }
-    nc.close();
+    {
+      PIO nc(grid.com, "netcdf3", grid.get_unit_system());
+      nc.open(delta_T_file, PISM_NOWRITE);
+      delta_T->read(nc, grid.time);
+      nc.close();
+    }
 
-    bool delta_T_factor_set;
-    delta_T_factor = 1.0;
-
-    PISMOptionsReal("-ocean_obm_factor", "ocean_obm_factor set", delta_T_factor,
-                    delta_T_factor_set);
+    delta_T_factor = options::Real("-ocean_obm_factor", "ocean_obm_factor set", 1.0);
   }
 }
 
@@ -243,8 +234,8 @@ void BoxModel::init_impl() {
 
   bool omeans_set = options::Bool("-ocean_means", "read mean salinity and temperatures")
 
-  // FIXME: not necessary when -ocean_means set
-  theta_ocean->init(filename, bc_period, bc_reference_time);
+                    // FIXME: not necessary when -ocean_means set
+                    theta_ocean->init(filename, bc_period, bc_reference_time);
   salinity_ocean->init(filename, bc_period, bc_reference_time);
 
   // read time-independent data right away:
@@ -256,10 +247,8 @@ void BoxModel::init_impl() {
   initBasinsOptions(cc);
 }
 
-void BoxModel::add_vars_to_output(std::string keyword,
-                                  std::set<std::string> &result) {
-  PGivenClimate<POModifier, OceanModel>::add_vars_to_output(keyword,
-                                                                result);
+void BoxModel::add_vars_to_output(std::string keyword, std::set<std::string> &result) {
+  PGivenClimate<POModifier, OceanModel>::add_vars_to_output(keyword, result);
 
   if (keyword != "none" and keyword != "small") {
     result.insert("shelfbtemp");
@@ -267,28 +256,11 @@ void BoxModel::add_vars_to_output(std::string keyword,
   }
 }
 
-void BoxModel::define_variables(std::set<std::string> vars, const PIO &nc,
-                                IO_Type nctype) {
-
-  PGivenClimate<POModifier, OceanModel>::define_variables(vars, nc, nctype);
-
-  if (set_contains(vars, "shelfbtemp")) {
-    shelfbtemp.define(nc, nctype);
-  }
-
-  if (set_contains(vars, "shelfbmassflux")) {
-    shelfbmassflux.define(nc, nctype);
-  }
-}
-
 void BoxModel::initBasinsOptions(const POBMConstants &cc) {
   m_log->message(4, "0b : set number of Basins\n");
 
   // set number of basins per option
-  bool number_of_basins_set;
-  numberOfBasins = cc.numberOfBasins;
-  PISMOptionsInt("-number_of_basins", "Number of Drainage Basins",
-                 numberOfBasins, number_of_basins_set);
+  numberOfBasins = options::Integer("-number_of_basins", "Number of Drainage Basins", cc.numberOfBasins);
 
   Toc_base_vec.resize(numberOfBasins);
   Soc_base_vec.resize(numberOfBasins);
@@ -305,13 +277,9 @@ void BoxModel::initBasinsOptions(const POBMConstants &cc) {
   mean_overturning_GLbox_vector.resize(numberOfBasins);
 
   // set gamma_T and value_C per option
-  bool gamma_T_set;
-  gamma_T = cc.gamma_T;
-  PISMOptionsReal("-gamma_T", "-gamma_T", gamma_T, gamma_T_set);
+  gamma_T = options::Real("-gamma_T", "FIXME: add description", cc.gamma_T);
 
-  bool value_C_set;
-  value_C = cc.value_C;
-  PISMOptionsReal("-value_C", "-value_C", value_C, value_C_set);
+  value_C = options::Real("-value_C", "FIXME: add description", cc.value_C);
 
   ///////////////////////////////////////////////////////////////////////////////////
   // data have been calculated previously for the 18 Rignot basins
@@ -329,18 +297,16 @@ void BoxModel::initBasinsOptions(const POBMConstants &cc) {
 
   // data have been calculated previously for the 20 Zwally basins
   const double Toc_base_schmidtko[20] = {
-    0.0,          271.39431005, 271.49081157, 271.49922596,
-    271.56714804, 271.63507013, 271.42228667, 271.46720524,
-    272.42253843, 271.53779093, 271.84942002, 271.31676801,
-    271.56846696, 272.79372542, 273.61694268, 274.19168456,
-    274.31958227, 273.38372579, 271.91951514, 271.35349906}; // Schmidtko
+    0.0,          271.39431005, 271.49081157, 271.49922596, 271.56714804, 271.63507013, 271.42228667,
+    271.46720524, 272.42253843, 271.53779093, 271.84942002, 271.31676801, 271.56846696, 272.79372542,
+    273.61694268, 274.19168456, 274.31958227, 273.38372579, 271.91951514, 271.35349906
+  }; // Schmidtko
 
   const double Soc_base_schmidtko[20] = {
-    0.0,         34.82193374, 34.69721226, 34.47641407,
-    34.48950162, 34.50258917, 34.70101507, 34.65306507,
-    34.73295029, 34.74859586, 34.8368573,  34.9529016,
-    34.79486795, 34.58380953, 34.7260615,  34.86198383,
-    34.8374212,  34.70418016, 34.75598208, 34.83617088}; // Schmidtko
+    0.0,         34.82193374, 34.69721226, 34.47641407, 34.48950162, 34.50258917, 34.70101507,
+    34.65306507, 34.73295029, 34.74859586, 34.8368573,  34.9529016,  34.79486795, 34.58380953,
+    34.7260615,  34.86198383, 34.8374212,  34.70418016, 34.75598208, 34.83617088
+  }; // Schmidtko
 
   // const double Toc_base_woa[18] = {0.0, 272.28351693, 272.10101401,
   // 271.65965597, 271.50766979, 273.02732277, 272.12473624, 271.79505722,
@@ -354,19 +320,15 @@ void BoxModel::initBasinsOptions(const POBMConstants &cc) {
   // Ocean Atlas
 
   const double Toc_base_woa[20] = {
-    272.99816667, 271.27814004, 272.1840257,
-    272.04435251, 272.20415662, 272.36396072,
-    271.48763831, 271.99695864, 272.06504052,
-    272.27114732, 272.66657018, 271.18920729,
-    271.74067699, 273.01811291, 272.15295572,
-    273.08542047, 272.74584469, 273.14263356,
-    272.58496563, 272.45217911}; // World Ocean Atlas
+    272.99816667, 271.27814004, 272.1840257,  272.04435251, 272.20415662, 272.36396072, 271.48763831,
+    271.99695864, 272.06504052, 272.27114732, 272.66657018, 271.18920729, 271.74067699, 273.01811291,
+    272.15295572, 273.08542047, 272.74584469, 273.14263356, 272.58496563, 272.45217911
+  }; // World Ocean Atlas
   const double Soc_base_woa[20] = {
-    34.6810522,  34.78161073, 34.67151084, 34.66538478,
-    34.67127468, 34.67716458, 34.75327377, 34.69213327,
-    34.72086382, 34.70670158, 34.71210592, 34.80229468,
-    34.76588022, 34.69745763, 34.7090778,  34.68690903,
-    34.66379606, 34.64572337, 34.6574402,  34.65813983}; // World Ocean Atlas
+    34.6810522,  34.78161073, 34.67151084, 34.66538478, 34.67127468, 34.67716458, 34.75327377,
+    34.69213327, 34.72086382, 34.70670158, 34.71210592, 34.80229468, 34.76588022, 34.69745763,
+    34.7090778,  34.68690903, 34.66379606, 34.64572337, 34.6574402,  34.65813983
+  }; // World Ocean Atlas
 
   options::String ocean_means("-ocean_means", "Input data name");
 
@@ -390,12 +352,11 @@ void BoxModel::initBasinsOptions(const POBMConstants &cc) {
     }
 
     gamma_T_star_vec[k] = gamma_T;
-    C_vec[k] = value_C;
+    C_vec[k]            = value_C;
   }
 
-  m_log->message(5,
-                 "     Using %d drainage basins and default values: \n"
-                 "     gamma_T_star= %.2e, C = %.2e... \n",
+  m_log->message(5, "     Using %d drainage basins and default values: \n"
+                    "     gamma_T_star= %.2e, C = %.2e... \n",
                  numberOfBasins, gamma_T, value_C);
 
   if (not ocean_means) {
@@ -404,13 +365,11 @@ void BoxModel::initBasinsOptions(const POBMConstants &cc) {
     // set continental shelf depth // FIXME -800 might be too high for
     // Antarctica
     continental_shelf_depth = cc.continental_shelf_depth;
-    options::Real shelf_depth("-continental_shelf_depth", "-continental_shelf_depth",
-                              continental_shelf_depth);
+    options::Real shelf_depth("-continental_shelf_depth", "-continental_shelf_depth", continental_shelf_depth);
     if (shelf_depth) {
       continental_shelf_depth = shelf_depth;
-      m_log->message(5,
-                     "  Depth of continental shelf for computation of temperature and salinity input\n"
-                     "  is set for whole domain to continental_shelf_depth=%.0f meter\n",
+      m_log->message(5, "  Depth of continental shelf for computation of temperature and salinity input\n"
+                        "  is set for whole domain to continental_shelf_depth=%.0f meter\n",
                      shelf_depth);
     }
   }
@@ -427,13 +386,13 @@ void BoxModel::update(double my_t, double my_dt) {
 
   if ((delta_T != NULL) and ocean_oceanboxmodel_deltaT_set) {
     temp_anomaly = (*delta_T)(my_t + 0.5 * my_dt);
-    m_log->message(4, "0a : set global temperature anomaly = %.3f\n",
-                   temp_anomaly);
+    m_log->message(4, "0a : set global temperature anomaly = %.3f\n", temp_anomaly);
   }
 
-  bool omeans_set = options::Bool("-ocean_means", "read mean salinity and temperatures")
+  bool omeans_set = options::Bool("-ocean_means", "read mean salinity and temperatures");
 
   POBMConstants cc(config);
+
   initBasinsOptions(cc);
 
   roundBasins();
@@ -471,58 +430,57 @@ void BoxModel::update(double my_t, double my_dt) {
 //! Round basin mask non integer values to an integral value of the next neighbor
 void BoxModel::roundBasins() {
   // FIXME: THIS routine should be applied once in init, and roundbasins should
-  // be stored as field
+  // be stored as a field
 
-  PISMOptionsIsSet("-round_basins", roundbasins_set);
+  bool round_basins = options::Bool("-round_basins", "FIXME: add description");
 
   list.add(*basins);
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-      double id_fractional = (*basins)(i, j),
-        id_fr_ne = (*basins)(i + 1, j + 1),
-        id_fr_nw = (*basins)(i - 1, j + 1),
-        id_fr_sw = (*basins)(i - 1, j - 1),
-        id_fr_se = (*basins)(i + 1, j - 1);
+    double
+      id_fractional = (*basins)(i, j),
+      id_fr_ne      = (*basins)(i + 1, j + 1),
+      id_fr_nw      = (*basins)(i - 1, j + 1),
+      id_fr_sw      = (*basins)(i - 1, j - 1),
+      id_fr_se      = (*basins)(i + 1, j - 1);
 
-      int id_rounded = static_cast<int>(round(id_fractional)),
-        id_ro_ne = static_cast<int>(round(id_fr_ne)),
-        id_ro_nw = static_cast<int>(round(id_fr_nw)),
-        id_ro_sw = static_cast<int>(round(id_fr_sw)),
-        id_ro_se = static_cast<int>(round(id_fr_se)), id = -1;
+    int
+      id_rounded = static_cast<int>(round(id_fractional)),
+      id_ro_ne   = static_cast<int>(round(id_fr_ne)),
+      id_ro_nw   = static_cast<int>(round(id_fr_nw)),
+      id_ro_sw   = static_cast<int>(round(id_fr_sw)),
+      id_ro_se   = static_cast<int>(round(id_fr_se)),
+      id         = -1;
 
-      if (roundbasins_set) {
+    if (round_basins) {
 
-        if (PetscAbs(id_fractional - static_cast<float>(id_rounded)) > 0.0) {
-          // if id_fractional differs from integer value
+      if (PetscAbs(id_fractional - static_cast<float>(id_rounded)) > 0.0) {
+        // if id_fractional differs from integer value
 
-          if (id_fr_sw == static_cast<float>(id_ro_sw) and id_fr_sw != 0) {
-            id = id_ro_sw;
-          } else if (id_fr_se == static_cast<float>(id_ro_se) and
-                     id_fr_se != 0) {
-            id = id_ro_se;
-          } else if (id_fr_nw == static_cast<float>(id_ro_nw) and
-                     id_fr_nw != 0) {
-            id = id_ro_nw;
-          } else if (id_fr_ne == static_cast<float>(id_ro_ne) and
-                     id_fr_ne != 0) {
-            id = id_ro_ne;
-          } else {
-            // if no neighbor has an integer id
-            id = id_rounded;
-          }
+        if (id_fr_sw == static_cast<float>(id_ro_sw) and id_fr_sw != 0) {
+          id = id_ro_sw;
+        } else if (id_fr_se == static_cast<float>(id_ro_se) and id_fr_se != 0) {
+          id = id_ro_se;
+        } else if (id_fr_nw == static_cast<float>(id_ro_nw) and id_fr_nw != 0) {
+          id = id_ro_nw;
+        } else if (id_fr_ne == static_cast<float>(id_ro_ne) and id_fr_ne != 0) {
+          id = id_ro_ne;
         } else {
-          // if id_rounded == id_fractional
+          // if no neighbor has an integer id
           id = id_rounded;
         }
       } else {
-        // if -round_basins not set
+        // if id_rounded == id_fractional
         id = id_rounded;
       }
-      (*basins)(i, j) = id;
+    } else {
+      // if -round_basins not set
+      id = id_rounded;
     }
-  }
+    (*basins)(i, j) = id;
+  } // end of loop over grid points
 }
 
 //! Identify ocean: identify ocean up to continental shelf without detached submarine islands
@@ -534,14 +492,12 @@ void BoxModel::identifyMASK(IceModelVec2S &inputmask, std::string masktype) {
 
   int seed_x = (grid.Mx - 1) / 2, seed_y = (grid.My - 1) / 2;
 
-  double linner_identified = 0.0, all_inner_identified = 1.0,
-    previous_step_identified = 0.0;
+  double linner_identified = 0.0, all_inner_identified = 1.0, previous_step_identified = 0.0;
   ;
 
   list.add(inputmask);
   inputmask.set(imask_unidentified);
-  if ((seed_x >= grid.xs) and (seed_x < grid.xs + grid.xm) and
-      (seed_y >= grid.ys) and (seed_y <= grid.ys + grid.ym)) {
+  if ((seed_x >= grid.xs) and (seed_x < grid.xs + grid.xm) and (seed_y >= grid.ys) and (seed_y <= grid.ys + grid.ym)) {
     inputmask(seed_x, seed_y) = imask_inner;
   }
 
@@ -556,29 +512,25 @@ void BoxModel::identifyMASK(IceModelVec2S &inputmask, std::string masktype) {
     list.add(*mask);
     list.add(*topg);
 
-    for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-      for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+    for (Points p(*m_grid); p; p.next()) {
+      const int i = p.i(), j = p.j();
 
-        bool masktype_condition = false;
-        if (masktype == "ocean") {
-          masktype_condition = ((*mask)(i, j) != maskocean or
-                                (*topg)(i, j) >= continental_shelf_depth);
-        } else if (masktype == "icerises") {
-          masktype_condition = ((*mask)(i, j) == maskgrounded);
-        }
-
-        if (masktype_condition and inputmask(i, j) == imask_unidentified and
-            (inputmask(i, j + 1) == imask_inner or
-             inputmask(i, j - 1) == imask_inner or
-             inputmask(i + 1, j) == imask_inner or
-             inputmask(i - 1, j) == imask_inner)) {
-          inputmask(i, j) = imask_inner;
-          linner_identified += 1;
-        } else if (masktype_condition == false) {
-          inputmask(i, j) = imask_outer;
-        }
+      bool masktype_condition = false;
+      if (masktype == "ocean") {
+        masktype_condition = ((*mask)(i, j) != maskocean or (*topg)(i, j) >= continental_shelf_depth);
+      } else if (masktype == "icerises") {
+        masktype_condition = ((*mask)(i, j) == maskgrounded);
       }
-    }
+
+      if (masktype_condition and inputmask(i, j) == imask_unidentified and
+          (inputmask(i, j + 1) == imask_inner or inputmask(i, j - 1) == imask_inner or
+           inputmask(i + 1, j) == imask_inner or inputmask(i - 1, j) == imask_inner)) {
+        inputmask(i, j) = imask_inner;
+        linner_identified += 1;
+      } else if (masktype_condition == false) {
+        inputmask(i, j) = imask_outer;
+      }
+    } // end of loop over grid points
 
     inputmask.update_ghosts();
 
@@ -589,21 +541,20 @@ void BoxModel::identifyMASK(IceModelVec2S &inputmask, std::string masktype) {
   list.add(inputmask);
   list.add(*mask);
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-      if (inputmask(i, j) == imask_unidentified) {
-        inputmask(i, j) = imask_exclude;
-      }
+    if (inputmask(i, j) == imask_unidentified) {
+      inputmask(i, j) = imask_exclude;
+    }
 
-      if (masktype == "ocean") {
-        // exclude ice covered parts
-        if ((*mask)(i, j) != maskocean and inputmask(i, j) == imask_inner) {
-          inputmask(i, j) = imask_outer;
-        }
+    if (masktype == "ocean") {
+      // exclude ice covered parts
+      if ((*mask)(i, j) != maskocean and inputmask(i, j) == imask_inner) {
+        inputmask(i, j) = imask_outer;
       }
     }
-  }
+  } // end of loop over grid points
 }
 
 //! When ocean_given is set compute mean salinity and temperature in each basin.
@@ -613,58 +564,49 @@ void BoxModel::computeOCEANMEANS() {
 
   m_log->message(4, "0b2: in computeOCEANMEANS routine \n");
 
-  double lm_count[numberOfBasins]; // count cells to take mean over for each basin
-  double m_count[numberOfBasins];
-  double lm_Sval[numberOfBasins]; // add salinity for each basin
-  double lm_Tval[numberOfBasins]; // add temperature for each basin
-  double m_Tval[numberOfBasins];
-  double m_Sval[numberOfBasins];
-
-  for (int k = 0; k < numberOfBasins; k++) {
-    m_count[k]  = 0.0;
-    lm_count[k] = 0.0;
-    lm_Sval[k]  = 0.0;
-    lm_Tval[k]  = 0.0;
-    m_Tval[k]   = 0.0;
-    m_Sval[k]   = 0.0;
-  }
+  // count cells to compute mean over for each basin
+  std::vector<double> basin_size(numberOfBasins, 0.0);
+  // add temperature for each basin
+  std::vector<double> basin_temperature(numberOfBasins, 0.0);
+  // add salinity for each basin
+  std::vector<double> basin_salinity(numberOfBasins, 0.0);
 
   list.add(OCEANMEANmask);
   list.add(*theta_ocean);
   list.add(*salinity_ocean); // salinity
   list.add(*basins);
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-      if (OCEANMEANmask(i, j) == imask_inner) {
-        int shelf_id = (*basins)(i, j);
-        lm_count[shelf_id] += 1;
-        lm_Sval[shelf_id] += (*salinity_ocean)(i, j);
-        lm_Tval[shelf_id] += (*theta_ocean)(i, j);
-      } // if
-    } // j
-  } // i
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
+
+    if (OCEANMEANmask(i, j) == imask_inner) {
+      int shelf_id = (*basins)(i, j);
+
+      basin_size[shelf_id]        += 1;
+      basin_salinity[shelf_id]    += (*salinity_ocean)(i, j);
+      basin_temperature[shelf_id] += (*theta_ocean)(i, j);
+    }
+  } // end of loop over grid points
 
   for (int k = 0; k < numberOfBasins; k++) {
-    m_count[k] = GlobalSum(grid.com, lm_count[k]);
-    m_Sval[k] = GlobalSum(grid.com, lm_Sval[k]);
-    m_Tval[k] = GlobalSum(grid.com, lm_Tval[k]);
 
-    if (k > 0 and m_count[k] == 0) {
+    basin_size[k]        = GlobalSum(grid.com, basin_size[k]);
+    basin_salinity[k]    = GlobalSum(grid.com, basin_salinity[k]);
+    basin_temperature[k] = GlobalSum(grid.com, basin_temperature[k]);
+
+    if (k > 0 and basin_size[k] == 0) {
       // if basin is not dummy basin 0 or there are no ocean cells in this basin
       // to take the mean over.
-      m_log->message(2, "PISM_WARNING: basin %d contains no ocean mean cells, "
-                     "no mean salinity or temperature values are computed! "
-                     "\n ",
+      m_log->message(2, "PISM_WARNING: basin %d contains no ocean mean cells,\n"
+                        "              no mean salinity or temperature values are computed!\n",
                      k);
     } else {
-      m_Sval[k] = m_Sval[k] / m_count[k];
-      m_Tval[k] = m_Tval[k] / m_count[k];
+      basin_salinity[k]    = basin_salinity[k] / basin_size[k];
+      basin_temperature[k] = basin_temperature[k] / basin_size[k];
 
-      Toc_base_vec[k] = m_Tval[k] - 273.15;
-      Soc_base_vec[k] = m_Sval[k];
-      m_log->message(4, "  %d: temp =%.3f, salinity=%.3f\n", k, Toc_base_vec[k],
-                     Soc_base_vec[k]);
+      Toc_base_vec[k] = basin_temperature[k] - 273.15;
+      Soc_base_vec[k] = basin_salinity[k];
+      m_log->message(4, "  %d: temp =%.3f, salinity=%.3f\n", k, Toc_base_vec[k], Soc_base_vec[k]);
     }
   }
 }
@@ -682,7 +624,7 @@ void BoxModel::extentOfIceShelves() {
   double lcounter_GLbox[numberOfBasins];
 
   for (int k = 0; k < numberOfBasins; k++) {
-    lcounter[k] = 0.0;
+    lcounter[k]       = 0.0;
     lcounter_CFbox[k] = 0.0;
     lcounter_GLbox[k] = 0.0;
   }
@@ -694,74 +636,61 @@ void BoxModel::extentOfIceShelves() {
     list.add(ICERISESmask);
   }
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-      if ((*mask)(i, j) == maskfloating) {
-        // if this is a ice shelf cell
-        int shelf_id = (*basins)(i, j);
-        lcounter[shelf_id]++;
+    if ((*mask)(i, j) == maskfloating) {
+      // if this is a ice shelf cell
+      int shelf_id = (*basins)(i, j);
+      lcounter[shelf_id]++;
 
-        bool neighbor_to_land;
-        if (exicerises_set) {
-          neighbor_to_land = (ICERISESmask(i, j + 1) == imask_inner or
-                              ICERISESmask(i, j - 1) == imask_inner or
-                              ICERISESmask(i + 1, j) == imask_inner or
-                              ICERISESmask(i - 1, j) == imask_inner or
-                              ICERISESmask(i + 1, j + 1) == imask_inner or
-                              ICERISESmask(i + 1, j - 1) == imask_inner or
-                              ICERISESmask(i - 1, j + 1) == imask_inner or
-                              ICERISESmask(i - 1, j - 1) == imask_inner);
-        } else {
-          neighbor_to_land = ((*mask)(i, j + 1) < maskfloating or
-                              (*mask)(i, j - 1) < maskfloating or
-                              (*mask)(i + 1, j) < maskfloating or
-                              (*mask)(i - 1, j) < maskfloating or
-                              (*mask)(i + 1, j + 1) < maskfloating or
-                              (*mask)(i + 1, j - 1) < maskfloating or
-                              (*mask)(i - 1, j + 1) < maskfloating or
-                              (*mask)(i - 1, j - 1) < maskfloating);
-        }
-
-        if (neighbor_to_land) {
-          // i.e. there is a grounded neighboring cell (which is not ice rise!)
-          BOXMODELmask(i, j) = box_GL;
-          lcounter_GLbox[shelf_id]++;
-
-        } else if ((*mask)(i, j + 1) == maskocean or
-                   (*mask)(i, j - 1) == maskocean or
-                   (*mask)(i + 1, j) == maskocean or
-                   (*mask)(i - 1, j) == maskocean or
-                   (*mask)(i + 1, j + 1) == maskocean or
-                   (*mask)(i + 1, j - 1) == maskocean or
-                   (*mask)(i - 1, j + 1) == maskocean or
-                   (*mask)(i - 1, j - 1) == maskocean) {
-          // i.e. there is an ocean neighboring cell
-          BOXMODELmask(i, j) = box_IF;
-          lcounter_CFbox[shelf_id]++;
-        } else {
-          // i.e., all other floating boxes
-          BOXMODELmask(i, j) = box_unidentified;
-          lcounter_box_unidentified++;
-        }
-
+      bool neighbor_to_land;
+      if (exicerises_set) {
+        neighbor_to_land = (ICERISESmask(i, j + 1) == imask_inner or ICERISESmask(i, j - 1) == imask_inner or
+                            ICERISESmask(i + 1, j) == imask_inner or ICERISESmask(i - 1, j) == imask_inner or
+                            ICERISESmask(i + 1, j + 1) == imask_inner or ICERISESmask(i + 1, j - 1) == imask_inner or
+                            ICERISESmask(i - 1, j + 1) == imask_inner or ICERISESmask(i - 1, j - 1) == imask_inner);
       } else {
-        // i.e., not floating
-        BOXMODELmask(i, j) = box_noshelf;
+        neighbor_to_land = ((*mask)(i, j + 1) < maskfloating or (*mask)(i, j - 1) < maskfloating or
+                            (*mask)(i + 1, j) < maskfloating or (*mask)(i - 1, j) < maskfloating or
+                            (*mask)(i + 1, j + 1) < maskfloating or (*mask)(i + 1, j - 1) < maskfloating or
+                            (*mask)(i - 1, j + 1) < maskfloating or (*mask)(i - 1, j - 1) < maskfloating);
       }
+
+      if (neighbor_to_land) {
+        // i.e. there is a grounded neighboring cell (which is not ice rise!)
+        BOXMODELmask(i, j) = box_GL;
+        lcounter_GLbox[shelf_id]++;
+
+      } else if ((*mask)(i, j + 1) == maskocean or (*mask)(i, j - 1) == maskocean or (*mask)(i + 1, j) == maskocean or
+                 (*mask)(i - 1, j) == maskocean or (*mask)(i + 1, j + 1) == maskocean or
+                 (*mask)(i + 1, j - 1) == maskocean or (*mask)(i - 1, j + 1) == maskocean or
+                 (*mask)(i - 1, j - 1) == maskocean) {
+        // i.e. there is an ocean neighboring cell
+        BOXMODELmask(i, j) = box_IF;
+        lcounter_CFbox[shelf_id]++;
+      } else {
+        // i.e., all other floating boxes
+        BOXMODELmask(i, j) = box_unidentified;
+        lcounter_box_unidentified++;
+      }
+
+    } else {
+      // i.e., not floating
+      BOXMODELmask(i, j) = box_noshelf;
     }
-  }
+  } // end of loop over grid points
 
   BOXMODELmask.update_ghosts();
 
   counter_box_unidentified = GlobalSum(grid.com, lcounter_box_unidentified);
   for (int k = 0; k < numberOfBasins; k++) {
-    counter[k] = GlobalSum(grid.com, lcounter[k]);
+    counter[k]       = GlobalSum(grid.com, lcounter[k]);
     counter_CFbox[k] = GlobalSum(grid.com, lcounter_CFbox[k]);
     counter_GLbox[k] = GlobalSum(grid.com, lcounter_GLbox[k]);
 
-    m_log->message(5, "  %d: cnt[k]=%.0f, cnt_CFbox=%.0f, cnt_GLbox=%.0f\n", k,
-                   counter[k], counter_CFbox[k], counter_GLbox[k]);
+    m_log->message(5, "  %d: cnt[k]=%.0f, cnt_CFbox=%.0f, cnt_GLbox=%.0f\n", k, counter[k], counter_CFbox[k],
+                   counter_GLbox[k]);
   }
 }
 
@@ -772,12 +701,10 @@ void BoxModel::identifyBOXMODELmask() {
 
   double lcounter_box_unidentified = counter_box_unidentified + 1.0;
 
-  while ((counter_box_unidentified > 0.0) and
-         (lcounter_box_unidentified != counter_box_unidentified)) {
+  while ((counter_box_unidentified > 0.0) and (lcounter_box_unidentified != counter_box_unidentified)) {
 
     lcounter_box_unidentified = counter_box_unidentified;
-    m_log->message(5, "     cnt_box_unidentified=%.0f\n",
-                   lcounter_box_unidentified);
+    m_log->message(5, "     cnt_box_unidentified=%.0f\n", lcounter_box_unidentified);
 
     for (int l = 0; l < 3; l++) {
       // FIXME size depends on how often this routine is called
@@ -797,21 +724,22 @@ void BoxModel::identifyBOXMODELmask() {
     double lcounter_GLbox[numberOfBasins];
     double all_counter_GLbox[numberOfBasins];
     for (int k = 0; k < numberOfBasins; k++) {
-      lcounter_GLbox[k] = 0.0;
+      lcounter_GLbox[k]    = 0.0;
       all_counter_GLbox[k] = 0.0;
     }
 
-    for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-      for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-        if (BOXMODELmask(i, j) == box_unidentified) {
-          // i.e. this is an unidentified shelf cell with a neighbor that is in the IFbox
-          m_log->message(5, "   left over i=%d, j=%d \n", i, j);
-          BOXMODELmask(i, j) = box_GL;
-          int shelf_id = (*basins)(i, j);
-          lcounter_GLbox[shelf_id]++;
-        }
+    for (Points p(*m_grid); p; p.next()) {
+      const int i = p.i(), j = p.j();
+
+      if (BOXMODELmask(i, j) == box_unidentified) {
+        // i.e. this is an unidentified shelf cell with a neighbor that is in the IFbox
+        m_log->message(5, "   left over i=%d, j=%d \n", i, j);
+        BOXMODELmask(i, j) = box_GL;
+        int shelf_id = (*basins)(i, j);
+        lcounter_GLbox[shelf_id]++;
       }
-    }
+    } // end of loop over grid points
+
 
     for (int k = 0; k < numberOfBasins; k++) {
       all_counter_GLbox[k] = GlobalSum(grid.com, lcounter_GLbox[k]);
@@ -820,11 +748,9 @@ void BoxModel::identifyBOXMODELmask() {
   }
 
   for (int k = 0; k < numberOfBasins; k++) {
-    m_log->message(5,
-                   "  %d: cnt[i] = %.0f, cnt_CFbox = %.0f, cnt_GLbox = %.0f, "
-                   " ratio_CF_box = %.3f, ratio_GL_box = %.3f\n",
-                   k, counter[k], counter_CFbox[k], counter_GLbox[k],
-                   counter_CFbox[k] / counter[k], counter_GLbox[k] / counter[k]);
+    m_log->message(
+        5, "  %d: cnt[i] = %.0f, cnt_CFbox = %.0f, cnt_GLbox = %.0f, ratio_CF_box = %.3f, ratio_GL_box = %.3f\n", k,
+        counter[k], counter_CFbox[k], counter_GLbox[k], counter_CFbox[k] / counter[k], counter_GLbox[k] / counter[k]);
   }
 }
 
@@ -835,7 +761,7 @@ void BoxModel::extendGLBox() {
   double lcounter_GLbox[numberOfBasins], all_counter_GLbox[numberOfBasins];
 
   for (int k = 0; k < numberOfBasins; k++) {
-    lcounter_GLbox[k] = 0.0;
+    lcounter_GLbox[k]    = 0.0;
     all_counter_GLbox[k] = 0.0;
   }
 
@@ -843,29 +769,28 @@ void BoxModel::extendGLBox() {
   list.add(*basins);
   list.add(BOXMODELmask);
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-      if (BOXMODELmask(i, j) == box_unidentified and
-          (BOXMODELmask(i, j + 1) == box_GL or
-           BOXMODELmask(i, j - 1) == box_GL or
-           BOXMODELmask(i + 1, j) == box_GL or
-           BOXMODELmask(i - 1, j) == box_GL)) {
-        // i.e. this is an unidentified shelf cell with a neighbor that is in the GLbox
-        BOXMODELmask(i, j) = box_neighboring;
-      }
-    }
-  }
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-      if (BOXMODELmask(i, j) == box_neighboring) {
-        BOXMODELmask(i, j) = box_GL;
-        lcounter_box_unidentified++;
-        int shelf_id = (*basins)(i, j);
-        lcounter_GLbox[shelf_id]++;
-      }
+    if (BOXMODELmask(i, j) == box_unidentified and
+        (BOXMODELmask(i, j + 1) == box_GL or BOXMODELmask(i, j - 1) == box_GL or BOXMODELmask(i + 1, j) == box_GL or
+         BOXMODELmask(i - 1, j) == box_GL)) {
+      // i.e. this is an unidentified shelf cell with a neighbor that is in the GLbox
+      BOXMODELmask(i, j) = box_neighboring;
     }
-  }
+  } // end of loop over grid points
+
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
+
+    if (BOXMODELmask(i, j) == box_neighboring) {
+      BOXMODELmask(i, j) = box_GL;
+      lcounter_box_unidentified++;
+      int shelf_id = (*basins)(i, j);
+      lcounter_GLbox[shelf_id]++;
+    }
+  } // end of loop over grid points
+
 
   BOXMODELmask.update_ghosts();
 
@@ -881,12 +806,12 @@ void BoxModel::extendGLBox() {
 //! extend the ice_front box with neighboring unidentified shelf cells.
 void BoxModel::extendIFBox() {
 
-  double lcounter_box_unidentified = 0.0;
+  double lcounter_box_unidentified    = 0.0;
   double all_counter_box_unidentified = 0.0;
   double lcounter_CFbox[numberOfBasins];
   double all_counter_CFbox[numberOfBasins];
   for (int k = 0; k < numberOfBasins; k++) {
-    lcounter_CFbox[k] = 0.0;
+    lcounter_CFbox[k]    = 0.0;
     all_counter_CFbox[k] = 0.0;
   }
 
@@ -894,29 +819,27 @@ void BoxModel::extendIFBox() {
   list.add(*basins);
   list.add(BOXMODELmask);
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-      if (BOXMODELmask(i, j) == box_unidentified and
-          (BOXMODELmask(i, j + 1) == box_IF or
-           BOXMODELmask(i, j - 1) == box_IF or
-           BOXMODELmask(i + 1, j) == box_IF or
-           BOXMODELmask(i - 1, j) == box_IF)) {
-        // i.e. this is an unidentified shelf cell with a neighbor that is in the IFbox
-        BOXMODELmask(i, j) = box_neighboring;
-      }
-    }
-  }
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
-      if (BOXMODELmask(i, j) == box_neighboring) {
-        BOXMODELmask(i, j) = box_IF;
-        lcounter_box_unidentified++;
-        int shelf_id = (*basins)(i, j);
-        lcounter_CFbox[shelf_id]++;
-      }
+    if (BOXMODELmask(i, j) == box_unidentified and
+        (BOXMODELmask(i, j + 1) == box_IF or BOXMODELmask(i, j - 1) == box_IF or BOXMODELmask(i + 1, j) == box_IF or
+         BOXMODELmask(i - 1, j) == box_IF)) {
+      // i.e. this is an unidentified shelf cell with a neighbor that is in the IFbox
+      BOXMODELmask(i, j) = box_neighboring;
     }
-  }
+  } // end of loop over grid points
+
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
+
+    if (BOXMODELmask(i, j) == box_neighboring) {
+      BOXMODELmask(i, j) = box_IF;
+      lcounter_box_unidentified++;
+      int shelf_id = (*basins)(i, j);
+      lcounter_CFbox[shelf_id]++;
+    }
+  } // end of loop over grid points
 
   BOXMODELmask.update_ghosts();
 
@@ -946,59 +869,56 @@ void BoxModel::oceanTemperature(const POBMConstants &cc) {
   list.add(Toc_anomaly);
   list.add(Toc);
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-      // make sure all temperatures are zero at the beginning of each time step
-      Toc(i, j)         = 273.15; // in K
-      Toc_base(i, j)    = 273.15; // in K
-      Toc_anomaly(i, j) = 0.0;  // in K or °C
-      Soc_base(i, j)    = 0.0;  // in psu
+    // make sure all temperatures are zero at the beginning of each time step
+    Toc(i, j)         = 273.15; // in Kelvin
+    Toc_base(i, j)    = 273.15; // in Kelvin
+    Toc_anomaly(i, j) = 0.0;    // in Kelvin or Celsius
+    Soc_base(i, j)    = 0.0;    // in psu
 
-      if ((*mask)(i, j) == maskfloating) {
-        int shelf_id = (*basins)(i, j);
-        Toc_base(i, j) = 273.15 + Toc_base_vec[shelf_id];
-        Soc_base(i, j) = Soc_base_vec[shelf_id];
+    if ((*mask)(i, j) == maskfloating) {
+      int shelf_id = (*basins)(i, j);
+      Toc_base(i, j) = 273.15 + Toc_base_vec[shelf_id];
+      Soc_base(i, j) = Soc_base_vec[shelf_id];
 
-        //! salinity and temperature for grounding line box
-        if (Soc_base(i, j) == 0.0 or Toc_base_vec[shelf_id] == 0.0) {
-          m_log->message(2,
-                         "PISM_ERROR: Missing Soc_base and Toc_base for %d, "
-                         "%d, basin %d \n   Aborting... \n",
-                         i, j, shelf_id);
-          PISMEnd();
-        }
+      //! salinity and temperature for grounding line box
+      if (Soc_base(i, j) == 0.0 or Toc_base_vec[shelf_id] == 0.0) {
+        m_log->message(2, "PISM_ERROR: Missing Soc_base and Toc_base for %d, %d, basin %d \n   Aborting... \n", i, j,
+                       shelf_id);
+        PISMEnd();
+      }
 
-        // Add temperature anomalies from given nc-file  // FIXME different
-        // nc-files for each basin!
-        if ((delta_T != NULL) and ocean_oceanboxmodel_deltaT_set) {
-          // Toc_anomaly(i, j) = delta_T_factor * (*delta_T)(m_t + 0.5*m_dt);
-          Toc_anomaly(i, j) = delta_T_factor * temp_anomaly;
+      // Add temperature anomalies from given nc-file  // FIXME different
+      // nc-files for each basin!
+      if ((delta_T != NULL) and ocean_oceanboxmodel_deltaT_set) {
+        // Toc_anomaly(i, j) = delta_T_factor * (*delta_T)(m_t + 0.5*m_dt);
+        Toc_anomaly(i, j) = delta_T_factor * temp_anomaly;
 
-        } else {
+      } else {
 
-          Toc_anomaly(i, j) = 0.0;
-        }
+        Toc_anomaly(i, j) = 0.0;
+      }
 
-        ////////////////
-        // prevent ocean temp from being below pressure melting temperature
+      ////////////////
+      // prevent ocean temp from being below pressure melting temperature
 
-        // const double shelfbaseelev = - (cc.rhoi / cc.rhow) *
-        // (*ice_thickness)(i, j);
+      // const double shelfbaseelev = - (cc.rhoi / cc.rhow) *
+      // (*ice_thickness)(i, j);
 
-        const double pressure = cc.rhoi * cc.earth_grav * (*ice_thickness)(i, j) * 1e-4;
-        // MUST be in dbar  // NOTE 1dbar = 10000 Pa = 1e4 kg m-1 s-2,
-        // FIXME need to include atmospheric pressure?
-        const double T_pmt = cc.a * Soc_base(i, j) + cc.b - cc.c * pressure;
+      const double pressure = cc.rhoi * cc.earth_grav * (*ice_thickness)(i, j) * 1e-4;
+      // MUST be in dbar  // NOTE 1dbar = 10000 Pa = 1e4 kg m-1 s-2,
+      // FIXME need to include atmospheric pressure?
+      const double T_pmt = cc.a * Soc_base(i, j) + cc.b - cc.c * pressure;
 
-        Toc_anomaly(i, j) = PetscMax(T_pmt + 273.15 - Toc_base(i, j), Toc_anomaly(i, j));
-        ////////////////
+      Toc_anomaly(i, j) = PetscMax(T_pmt + 273.15 - Toc_base(i, j), Toc_anomaly(i, j));
+      ////////////////
 
-        Toc(i, j) = Toc_base(i, j) + Toc_anomaly(i, j); // in K
+      Toc(i, j) = Toc_base(i, j) + Toc_anomaly(i, j); // in Kelvin
 
-      } // end if herefloating
-    }   // end j
-  }     // end i
+    } // end if herefloating
+  }   // end of loop over grid points
 }
 
 // NOTE Mean Gl_box melt rate is needed for basalMeltRateForIceFrontBox(). Here,
@@ -1009,11 +929,8 @@ void BoxModel::oceanTemperature(const POBMConstants &cc) {
 void BoxModel::basalMeltRateForGroundingLineBox(const POBMConstants &cc) {
   m_log->message(4, "B1 : in basal melt rate gl routine\n");
 
-  double
-    lcounter_edge_of_GLbox_vector[numberOfBasins],
-    lmean_salinity_GLbox_vector[numberOfBasins],
-    lmean_meltrate_GLbox_vector[numberOfBasins],
-    lmean_overturning_GLbox_vector[numberOfBasins];
+  double lcounter_edge_of_GLbox_vector[numberOfBasins], lmean_salinity_GLbox_vector[numberOfBasins],
+      lmean_meltrate_GLbox_vector[numberOfBasins], lmean_overturning_GLbox_vector[numberOfBasins];
 
   for (int k = 0; k < numberOfBasins; k++) {
     lcounter_edge_of_GLbox_vector[k]  = 0.0;
@@ -1037,134 +954,125 @@ void BoxModel::basalMeltRateForGroundingLineBox(const POBMConstants &cc) {
 
   double countHelpterm = 0, lcountHelpterm = 0;
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-      int shelf_id = (*basins)(i, j);
+    int shelf_id = (*basins)(i, j);
 
-      // Make sure everything is at default values at the beginning of each
-      // time step
-      T_star(i, j)        = 0.0; // in °C
-      Toc_inCelsius(i, j) = 0.0; // in °C
-      Soc(i, j)           = 0.0; // in psu
+    // Make sure everything is at default values at the beginning of each
+    // time step
+    T_star(i, j)        = 0.0; // in Celsius
+    Toc_inCelsius(i, j) = 0.0; // in Celsius
+    Soc(i, j)           = 0.0; // in psu
 
-      basalmeltrate_shelf(i, j) = 0.0;
-      overturning(i, j) = 0.0;
+    basalmeltrate_shelf(i, j) = 0.0;
+    overturning(i, j)         = 0.0;
 
-      if (BOXMODELmask(i, j) == box_GL and shelf_id > 0.0) {
+    if (BOXMODELmask(i, j) == box_GL and shelf_id > 0.0) {
 
-        const double pressure = cc.rhoi * cc.earth_grav * (*ice_thickness)(i, j) * 1e-4; // MUST be in dbar
-        // NOTE 1dbar = 10000 Pa = 1e4 kg m-1 s-2
-        // FIXME need to include atmospheric pressure?
-        T_star(i, j) = cc.a * Soc_base(i, j) + cc.b - cc.c * pressure -
-          (Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)); // in °C
+      const double pressure = cc.rhoi * cc.earth_grav * (*ice_thickness)(i, j) * 1e-4; // MUST be in dbar
+      // NOTE 1dbar = 10000 Pa = 1e4 kg m-1 s-2
+      // FIXME need to include atmospheric pressure?
+      T_star(i, j) =
+        cc.a * Soc_base(i, j) + cc.b - cc.c * pressure - (Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)); // in Celsius
 
-        double
-          gamma_T_star = gamma_T_star_vec[shelf_id],
-          C1 = C_vec[shelf_id],
-          g1 = ((counter_GLbox[shelf_id] * grid.dx * grid.dy) * gamma_T_star /
-                (C1 * cc.rho_star));
+      double gamma_T_star = gamma_T_star_vec[shelf_id], C1 = C_vec[shelf_id],
+        g1 = ((counter_GLbox[shelf_id] * grid.dx * grid.dy) * gamma_T_star / (C1 * cc.rho_star));
 
-        //! temperature for grounding line box
+      //! temperature for grounding line box
 
-        double helpterm1 = (g1 / (cc.beta * (Soc_base(i, j) / (cc.nu * cc.lambda)) - cc.alpha)); // in 1 / (1/°C) = °C
-        double helpterm2 = ((g1 * T_star(i, j)) /
-                             (cc.beta * (Soc_base(i, j) / (cc.nu * cc.lambda)) - cc.alpha)); // in °C / (1/°C) = °C^2
+      double helpterm1 = (g1 / (cc.beta * (Soc_base(i, j) / (cc.nu * cc.lambda)) - cc.alpha)); // in 1 / (1/Celsius) = Celsius
+      double helpterm2 = ((g1 * T_star(i, j)) /
+                          (cc.beta * (Soc_base(i, j) / (cc.nu * cc.lambda)) - cc.alpha)); // in Celsius / (1/Celsius) = Celsius^2
 
-        if ((0.25 * PetscSqr(helpterm1) - helpterm2) < 0.0) {
-          helpterm2 = 0.25 * PetscSqr(helpterm1);
-          // FIXME: This might be wrong!
-          lcountHelpterm += 1;
-        }
-
-        // NOTE Careful, Toc_base(i, j) is in K, Toc_inCelsius(i, j) NEEDS to be
-        // in °C!
-        Toc_inCelsius(i, j) = ((Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) -
-                               (-0.5 * helpterm1 + sqrt(0.25 * PetscSqr(helpterm1) - helpterm2)));
-
-        //! salinity for grounding line box
-        Soc(i, j) = (Soc_base(i, j) - (Soc_base(i, j) / (cc.nu * cc.lambda)) *
-                     ((Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) -
-                      Toc_inCelsius(i, j))); // in psu
-
-        //! basal melt rate for grounding line box
-        basalmeltrate_shelf(i, j) = ((-gamma_T_star / (cc.nu * cc.lambda)) *
-                                     (cc.a * Soc(i, j) + cc.b - cc.c * pressure -
-                                      Toc_inCelsius(i, j))); // in m/s
-
-        //! overturning
-        //
-        // NOTE Actually, there is of course no overturning-FIELD, it is only a scalar for each
-        // shelf.
-        //
-        // Here, I compute overturning as
-        //
-        // MEAN[C1*cc.rho_star* (cc.beta*(Soc_base(i, j)-Soc(i, j)) - cc.alpha*((Toc_base(i,
-        // j)-273.15+Toc_anomaly(i, j))-Toc_inCelsius(i, j)))]
-        //
-        // while in fact it should be
-        //
-        // C1*cc.rho_star* (cc.beta*(Soc_base-MEAN[Soc(i, j)]) -
-        // cc.alpha*((Toc_base-273.15+Toc_anomaly)-MEAN[Toc_inCelsius(i, j)]))
-        //
-        // which is the SAME since Soc_base, Toc_base and Toc_anomaly are the
-        // same FOR ALL i, j CONSIDERED, so this is just nomenclature!
-        overturning(i, j) = C1 * cc.rho_star *
-          (cc.beta * (Soc_base(i, j) - Soc(i, j)) -
-           cc.alpha * ((Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) - Toc_inCelsius(i, j))); // in m^3/s
-
-        if (BOXMODELmask(i - 1, j) == box_IF or
-            BOXMODELmask(i + 1, j) == box_IF or
-            BOXMODELmask(i, j - 1) == box_IF or
-            BOXMODELmask(i, j + 1) == box_IF) {
-          // i.e., if this cell is from the GL box and one of the neighbors is from the CF box - It
-          // is important to only take the border of the grounding line box to the calving front box
-          // into account, because the following mean value will be used to compute the value for
-          // the calving front box. I.e., this helps avoiding discontinuities!
-
-          lcounter_edge_of_GLbox_vector[shelf_id]  += 1;
-          lmean_salinity_GLbox_vector[shelf_id]    += Soc(i, j);
-          lmean_meltrate_GLbox_vector[shelf_id]    += basalmeltrate_shelf(i, j);
-          lmean_overturning_GLbox_vector[shelf_id] += overturning(i, j);
-        }
-        // no else-case necessary since all variables are set to zero at the beginning of this
-        // routine
-
-      } else { // i.e., not GL_box
-        basalmeltrate_shelf(i, j) = 0.0;
+      if ((0.25 * PetscSqr(helpterm1) - helpterm2) < 0.0) {
+        helpterm2 = 0.25 * PetscSqr(helpterm1);
+        // FIXME: This might be wrong!
+        lcountHelpterm += 1;
       }
-    } // end j
-  }   // end i
+
+      // NOTE Careful, Toc_base(i, j) is in Kelvin, Toc_inCelsius(i, j) NEEDS to be
+      // in Celsius!
+      Toc_inCelsius(i, j) = ((Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) -
+                             (-0.5 * helpterm1 + sqrt(0.25 * PetscSqr(helpterm1) - helpterm2)));
+
+      //! salinity for grounding line box
+      Soc(i, j) = (Soc_base(i, j) -
+                   (Soc_base(i, j) / (cc.nu * cc.lambda)) *
+                   ((Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) - Toc_inCelsius(i, j))); // in psu
+
+      //! basal melt rate for grounding line box
+      basalmeltrate_shelf(i, j) = ((-gamma_T_star / (cc.nu * cc.lambda)) *
+                                   (cc.a * Soc(i, j) + cc.b - cc.c * pressure - Toc_inCelsius(i, j))); // in m/s
+
+      //! overturning
+      //
+      // NOTE Actually, there is of course no overturning-FIELD, it is only a scalar for each
+      // shelf.
+      //
+      // Here, I compute overturning as
+      //
+      // MEAN[C1*cc.rho_star* (cc.beta*(Soc_base(i, j)-Soc(i, j)) - cc.alpha*((Toc_base(i,
+      // j)-273.15+Toc_anomaly(i, j))-Toc_inCelsius(i, j)))]
+      //
+      // while in fact it should be
+      //
+      // C1*cc.rho_star* (cc.beta*(Soc_base-MEAN[Soc(i, j)]) -
+      // cc.alpha*((Toc_base-273.15+Toc_anomaly)-MEAN[Toc_inCelsius(i, j)]))
+      //
+      // which is the SAME since Soc_base, Toc_base and Toc_anomaly are the
+      // same FOR ALL i, j CONSIDERED, so this is just nomenclature!
+      overturning(i, j) =
+        C1 * cc.rho_star *
+        (cc.beta * (Soc_base(i, j) - Soc(i, j)) -
+         cc.alpha * ((Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) - Toc_inCelsius(i, j))); // in m^3/s
+
+      if (BOXMODELmask(i - 1, j) == box_IF or BOXMODELmask(i + 1, j) == box_IF or BOXMODELmask(i, j - 1) == box_IF or
+          BOXMODELmask(i, j + 1) == box_IF) {
+        // i.e., if this cell is from the GL box and one of the neighbors is from the CF box - It
+        // is important to only take the border of the grounding line box to the calving front box
+        // into account, because the following mean value will be used to compute the value for
+        // the calving front box. I.e., this helps avoiding discontinuities!
+
+        lcounter_edge_of_GLbox_vector[shelf_id] += 1;
+        lmean_salinity_GLbox_vector[shelf_id] += Soc(i, j);
+        lmean_meltrate_GLbox_vector[shelf_id] += basalmeltrate_shelf(i, j);
+        lmean_overturning_GLbox_vector[shelf_id] += overturning(i, j);
+      }
+      // no else-case necessary since all variables are set to zero at the beginning of this
+      // routine
+
+    } else { // i.e., not GL_box
+      basalmeltrate_shelf(i, j) = 0.0;
+    }
+  } // end of loop over grid points
 
   for (int k = 0; k < numberOfBasins; k++) {
     double counter_edge_of_GLbox_vector = 0.0;
-    counter_edge_of_GLbox_vector = GlobalSum(grid.com, lcounter_edge_of_GLbox_vector[k]);
-    mean_meltrate_GLbox_vector[k] = GlobalSum(grid.com, lmean_meltrate_GLbox_vector[k]);
-    mean_salinity_GLbox_vector[k] = GlobalSum(grid.com, lmean_salinity_GLbox_vector[k]);
-    mean_overturning_GLbox_vector[k] = GlobalSum(grid.com, lmean_overturning_GLbox_vector[k]);
+    counter_edge_of_GLbox_vector        = GlobalSum(grid.com, lcounter_edge_of_GLbox_vector[k]);
+    mean_meltrate_GLbox_vector[k]       = GlobalSum(grid.com, lmean_meltrate_GLbox_vector[k]);
+    mean_salinity_GLbox_vector[k]       = GlobalSum(grid.com, lmean_salinity_GLbox_vector[k]);
+    mean_overturning_GLbox_vector[k]    = GlobalSum(grid.com, lmean_overturning_GLbox_vector[k]);
 
     if (counter_edge_of_GLbox_vector > 0.0) {
-      mean_salinity_GLbox_vector[k] = mean_salinity_GLbox_vector[k] / counter_edge_of_GLbox_vector;
-      mean_meltrate_GLbox_vector[k] = mean_meltrate_GLbox_vector[k] / counter_edge_of_GLbox_vector;
+      mean_salinity_GLbox_vector[k]    = mean_salinity_GLbox_vector[k] / counter_edge_of_GLbox_vector;
+      mean_meltrate_GLbox_vector[k]    = mean_meltrate_GLbox_vector[k] / counter_edge_of_GLbox_vector;
       mean_overturning_GLbox_vector[k] = mean_overturning_GLbox_vector[k] / counter_edge_of_GLbox_vector;
     } else { // This means that there is no [cell from the GLbox neighboring a
              // cell from the CFbox], NOT necessarily that there is no GLbox!
-      mean_salinity_GLbox_vector[k] = 0.0;
-      mean_meltrate_GLbox_vector[k] = 0.0;
+      mean_salinity_GLbox_vector[k]    = 0.0;
+      mean_meltrate_GLbox_vector[k]    = 0.0;
       mean_overturning_GLbox_vector[k] = 0.0;
     }
 
-    m_log->message(5, "  %d: cnt=%.0f, sal=%.3f, melt=%.3e, over=%.1e \n", k,
-                   counter_edge_of_GLbox_vector, mean_salinity_GLbox_vector[k],
-                   mean_meltrate_GLbox_vector[k],
-                   mean_overturning_GLbox_vector[k]);
+    m_log->message(5, "  %d: cnt=%.0f, sal=%.3f, melt=%.3e, over=%.1e \n", k, counter_edge_of_GLbox_vector,
+                   mean_salinity_GLbox_vector[k], mean_meltrate_GLbox_vector[k], mean_overturning_GLbox_vector[k]);
   }
 
   countHelpterm = GlobalSum(grid.com, lcountHelpterm);
 
   if (countHelpterm > 0) {
-    m_log->message(2, "B1!: PISM_WARNING: square-root has been negative in %.0f cases!\n",
-                   countHelpterm);
+    m_log->message(2, "B1!: PISM_WARNING: square-root has been negative in %.0f cases!\n", countHelpterm);
   }
 }
 
@@ -1188,104 +1096,95 @@ void BoxModel::basalMeltRateForIceFrontBox(const POBMConstants &cc) {
   list.add(overturning);
   list.add(basalmeltrate_shelf);
 
-  double countk4 = 0, lcountk4 = 0, countGl0 = 0, lcountGl0 = 0, countSqr = 0,
-    lcountSqr = 0, countMean0 = 0, lcountMean0 = 0;
+  double countk4 = 0, lcountk4 = 0, countGl0 = 0, lcountGl0 = 0, countSqr = 0, lcountSqr = 0, countMean0 = 0,
+         lcountMean0 = 0;
 
   //! The ice front box = BOX I
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) { // FIXME REPAIR
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+  for (Points p(*m_grid); p; p.next()) { // FIXME REPAIR
+    const int i = p.i(), j = p.j();
 
-      int shelf_id = (*basins)(i, j);
+    int shelf_id = (*basins)(i, j);
 
-      if (BOXMODELmask(i, j) == box_IF and shelf_id > 0.0) {
+    if (BOXMODELmask(i, j) == box_IF and shelf_id > 0.0) {
 
-        const double pressure = cc.rhoi * cc.earth_grav * (*ice_thickness)(i, j) *
-          1e-4; // MUST be in dbar
-        // NOTE 1dbar = 10000 Pa = 1e4 kg m-1 s-2
-        // FIXME need to include atmospheric pressure?
-        T_star(i, j) = cc.a * Soc_base(i, j) + cc.b - cc.c * pressure -
-          (Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)); // in °C
+      const double pressure = cc.rhoi * cc.earth_grav * (*ice_thickness)(i, j) * 1e-4; // MUST be in dbar
+      // NOTE 1dbar = 10000 Pa = 1e4 kg m-1 s-2
+      // FIXME need to include atmospheric pressure?
+      T_star(i, j) =
+        cc.a * Soc_base(i, j) + cc.b - cc.c * pressure - (Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)); // in Celsius
 
-        double gamma_T_star, area_GLbox, area_CFbox, mean_salinity_in_GLbox,
-          mean_meltrate_in_GLbox, mean_overturning_in_GLbox;
+      double gamma_T_star, area_GLbox, area_CFbox, mean_salinity_in_GLbox, mean_meltrate_in_GLbox,
+        mean_overturning_in_GLbox;
 
-        gamma_T_star = gamma_T_star_vec[shelf_id];
-        area_CFbox = (counter_CFbox[shelf_id] * grid.dx * grid.dy);
-        area_GLbox = (counter_GLbox[shelf_id] * grid.dx * grid.dy);
-        mean_salinity_in_GLbox = mean_salinity_GLbox_vector[shelf_id];
-        mean_meltrate_in_GLbox = mean_meltrate_GLbox_vector[shelf_id];
-        mean_overturning_in_GLbox = mean_overturning_GLbox_vector[shelf_id];
+      gamma_T_star              = gamma_T_star_vec[shelf_id];
+      area_CFbox                = (counter_CFbox[shelf_id] * grid.dx * grid.dy);
+      area_GLbox                = (counter_GLbox[shelf_id] * grid.dx * grid.dy);
+      mean_salinity_in_GLbox    = mean_salinity_GLbox_vector[shelf_id];
+      mean_meltrate_in_GLbox    = mean_meltrate_GLbox_vector[shelf_id];
+      mean_overturning_in_GLbox = mean_overturning_GLbox_vector[shelf_id];
 
-        if (area_GLbox == 0) {
-          // if there is no grounding line box in the current basin, set BOXMODELmask to 3 and
-          // compute basal melt rate by Beckmann-Gose
+      if (area_GLbox == 0) {
+        // if there is no grounding line box in the current basin, set BOXMODELmask to 3 and
+        // compute basal melt rate by Beckmann-Gose
+        BOXMODELmask(i, j) = box_other;
+        lcountGl0 += 1;
+
+      } else {
+
+        double k1 = (area_CFbox * gamma_T_star) / (cc.nu * cc.lambda);
+        // in (m^2*m/s)/(Celsius) = m^3/(s*Celsius)
+        double k2 = 1 / (mean_overturning_in_GLbox + area_CFbox * gamma_T_star);
+        // in s/m^3
+        double k3 = (area_CFbox * gamma_T_star * T_star(i, j) - cc.nu * cc.lambda * area_GLbox * mean_meltrate_in_GLbox);
+        // in m^2 * m/s * Celsius = m^3 * Celsius / s
+        double k4 = (-k1 * k2 * area_CFbox * gamma_T_star * cc.a + k1 * cc.a);
+        // in m^3/(s*Celsius) * s/m^3 * m^2 * m/s * Celsius/psu = m^3/(s*psu)
+        double k5 = (mean_overturning_in_GLbox + Soc_base(i, j) * k1 * k2 * area_CFbox * gamma_T_star * cc.a -
+                     k1 * Soc_base(i, j) * cc.a - k1 * T_star(i, j) + k1 * k2 * k3);
+        // in m^3/s
+        double k6 = (k1 * Soc_base(i, j) * T_star(i, j) - k1 * k2 * Soc_base(i, j) * k3 -
+                     area_GLbox * mean_meltrate_in_GLbox * mean_salinity_in_GLbox);
+        // in psu * m^3/s
+
+        //! salinity for calving front box
+        if (k4 == 0.0) {
+          // FIXME rewrite this warning? Do not stop but calculate melt rates
+          // according to Beckmann-Gose?
+          lcountk4 += 1;
           BOXMODELmask(i, j) = box_other;
-          lcountGl0 += 1;
+          continue;
+        }
 
-        } else {
+        if ((0.25 * PetscSqr(k5 / k4) - (k6 / k4)) < 0.0) {
+          lcountSqr += 1;
+          BOXMODELmask(i, j) = box_other;
+          continue;
+        }
 
-          double k1, k2, k3, k4, k5, k6;
+        Soc(i, j) = (Soc_base(i, j) - (-0.5 * (k5 / k4) - sqrt(0.25 * PetscSqr(k5 / k4) - (k6 / k4)))); // in psu
 
-          k1 = (area_CFbox * gamma_T_star) / (cc.nu * cc.lambda);
-          // in (m^2*m/s)/(°C) = m^3/(s*°C)
-          k2 = 1 / (mean_overturning_in_GLbox + area_CFbox * gamma_T_star);
-          // in s/m^3
-          k3 = (area_CFbox * gamma_T_star * T_star(i, j) -
-                cc.nu * cc.lambda * area_GLbox * mean_meltrate_in_GLbox);
-          // in m^2 * m/s * °C = m^3 * °C / s
-          k4 = (-k1 * k2 * area_CFbox * gamma_T_star * cc.a + k1 * cc.a);
-          // in m^3/(s*°C) * s/m^3 * m^2 * m/s * °C/psu = m^3/(s*psu)
-          k5 = (mean_overturning_in_GLbox +
-                Soc_base(i, j) * k1 * k2 * area_CFbox * gamma_T_star * cc.a -
-                k1 * Soc_base(i, j) * cc.a - k1 * T_star(i, j) + k1 * k2 * k3);
-          // in m^3/s
-          k6 = (k1 * Soc_base(i, j) * T_star(i, j) -
-                k1 * k2 * Soc_base(i, j) * k3 -
-                area_GLbox * mean_meltrate_in_GLbox * mean_salinity_in_GLbox);
-          // in psu * m^3/s
+        //! temperature for calving front box
+        // NOTE Careful, Toc_base(i, j) is in Kelvin, Toc_inCelsius(i, j) NEEDS to
+        // be in Celsius!
+        Toc_inCelsius(i, j) = (Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) -
+          (k2 * area_CFbox * gamma_T_star * cc.a * (Soc_base(i, j) - Soc(i, j)) - k2 * k3);
 
-          //! salinity for calving front box
-          if (k4 == 0.0) {
-            // FIXME rewrite this warning? Do not stop but calculate melt rates
-            // according to Beckmann-Gose?
-            lcountk4 += 1;
-            BOXMODELmask(i, j) = box_other;
-            continue;
-          }
+        //! basal melt rate for calving front box
+        basalmeltrate_shelf(i, j) = ((-gamma_T_star / (cc.nu * cc.lambda)) *
+                                     (cc.a * Soc(i, j) + cc.b - cc.c * pressure - Toc_inCelsius(i, j))); // in m/s
 
-          if ((0.25 * PetscSqr(k5 / k4) - (k6 / k4)) < 0.0) {
-            lcountSqr += 1;
-            BOXMODELmask(i, j) = box_other;
-            continue;
-          }
-
-          Soc(i, j) = (Soc_base(i, j) - (-0.5 * (k5 / k4) - sqrt(0.25 * PetscSqr(k5 / k4) - (k6 / k4)))); // in psu
-
-          //! temperature for calving front box
-          // NOTE Careful, Toc_base(i, j) is in K, Toc_inCelsius(i, j) NEEDS to
-          // be in °C!
-          Toc_inCelsius(i, j) = (Toc_base(i, j) - 273.15 + Toc_anomaly(i, j)) -
-            (k2 * area_CFbox * gamma_T_star * cc.a * (Soc_base(i, j) - Soc(i, j)) - k2 * k3);
-
-          //! basal melt rate for calving front box
-          basalmeltrate_shelf(i, j) = ((-gamma_T_star / (cc.nu * cc.lambda)) *
-                                       (cc.a * Soc(i, j) + cc.b - cc.c * pressure -
-                                        Toc_inCelsius(i, j))); // in m/s
-
-          if (mean_salinity_in_GLbox == 0.0 or mean_meltrate_in_GLbox == 0.0 or
-              mean_overturning_in_GLbox == 0.0) {
-            // this must not occur since there must always be a GL_box neighbor
-            lcountMean0 += 1;
-            BOXMODELmask(i, j) = box_other;
-            continue;
-          }
+        if (mean_salinity_in_GLbox == 0.0 or mean_meltrate_in_GLbox == 0.0 or mean_overturning_in_GLbox == 0.0) {
+          // this must not occur since there must always be a GL_box neighbor
+          lcountMean0 += 1;
+          BOXMODELmask(i, j) = box_other;
+          continue;
         }
       }
-      // NOTE NO else-case, since basalMeltRateForGroundingLineBox() and
-      // basalMeltRateForOtherShelves() cover all other cases and we would overwrite those results
-      // here.
-    }   // end j
-  }     // end i
+    }
+    // NOTE NO else-case, since basalMeltRateForGroundingLineBox() and
+    // basalMeltRateForOtherShelves() cover all other cases and we would overwrite those results
+    // here.
+  } // end of loop over grid points
 
   countk4    = GlobalSum(grid.com, lcountk4);
   countGl0   = GlobalSum(grid.com, lcountGl0);
@@ -1293,31 +1192,25 @@ void BoxModel::basalMeltRateForIceFrontBox(const POBMConstants &cc) {
   countMean0 = GlobalSum(grid.com, lcountMean0);
 
   if (countk4 > 0) {
-    m_log->message(2, "B2!: PISM_WARNING: k4 is zero in %.0f case(s)!\n",
-                   countk4);
+    m_log->message(2, "B2!: PISM_WARNING: k4 is zero in %.0f case(s)!\n", countk4);
   }
 
   if (countGl0 > 0) {
-    m_log->message(2,
-                   "B2!: PISM_WARNING: no grounding line box in basin in %.0f case(s)!\n",
-                   countGl0);
+    m_log->message(2, "B2!: PISM_WARNING: no grounding line box in basin in %.0f case(s)!\n", countGl0);
   }
 
   if (countSqr > 0) {
-    m_log->message(2, "B2!: PISM_WARNING: square root is negative in %.0f case(s)!\n",
-                   countSqr);
+    m_log->message(2, "B2!: PISM_WARNING: square root is negative in %.0f case(s)!\n", countSqr);
   }
 
   if (countMean0 > 0) {
-    m_log->message(2,
-                   "B2!: PISM_WARNING: mean of salinity, melt rate or "
-                   "overturning is zero in %.0f case(s)!\n",
+    m_log->message(2, "B2!: PISM_WARNING: mean of salinity, melt rate or overturning is zero in %.0f case(s)!\n",
                    countMean0);
   }
 }
 
-//! Convert Toc_inCelsius from °C to K and write into Toc for the .nc-file; NOTE
-//It is crucial, that Toc_inCelsius is in °C for the computation of the basal
+//! Convert Toc_inCelsius from Celsius to Kelvin and write into Toc for the .nc-file; NOTE
+//It is crucial, that Toc_inCelsius is in Celsius for the computation of the basal
 //melt rate
 //! Compute the melt rate for all other ice shelves.
 void BoxModel::basalMeltRateForOtherShelves(const POBMConstants &cc) {
@@ -1335,49 +1228,45 @@ void BoxModel::basalMeltRateForOtherShelves(const POBMConstants &cc) {
                                  // kg-1 * kg m-3) = m s-1
   list.add(heatflux);
 
-  for (int i = grid.xs; i < grid.xs + grid.xm; ++i) {
-    for (int j = grid.ys; j < grid.ys + grid.ym; ++j) {
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
 
-      int shelf_id = (*basins)(i, j);
+    int shelf_id = (*basins)(i, j);
 
-      if (shelf_id == 0) { // boundary of computational domain
+    if (shelf_id == 0) { // boundary of computational domain
 
-        basalmeltrate_shelf(i, j) = 0.0;
+      basalmeltrate_shelf(i, j) = 0.0;
 
-      } else if (BOXMODELmask(i, j) == box_other) {
+    } else if (BOXMODELmask(i, j) == box_other) {
 
-        Toc(i, j) = Toc_base(i, j) + Toc_anomaly(i, j);
-        // in K, NOTE: Toc_base is already in K, so no (+273.15)
-        // default: compute the melt rate from the temperature field according
-        // to beckmann_goosse03 (see below)
+      Toc(i, j) = Toc_base(i, j) + Toc_anomaly(i, j);
+      // in Kelvin, NOTE: Toc_base is already in Kelvin, so no (+273.15)
+      // default: compute the melt rate from the temperature field according
+      // to beckmann_goosse03 (see below)
 
-        const double shelfbaseelev = -(cc.rhoi / cc.rhow) * (*ice_thickness)(i, j);
+      const double shelfbaseelev = -(cc.rhoi / cc.rhow) * (*ice_thickness)(i, j);
 
-        // FIXME: for consistency reasons there should be constants a, b, c,
-        // gamma_T used
-        double T_f = 273.15 + (cc.a * cc.meltSalinity + cc.b2 +
-                               cc.c * shelfbaseelev); // add 273.15 to get it in
-                                                      // Kelvin... 35 is the
-                                                      // salinity
+      // FIXME: for consistency reasons there should be constants a, b, c,
+      // gamma_T used
+      double T_f = 273.15 + (cc.a * cc.meltSalinity + cc.b2 + cc.c * shelfbaseelev); // add 273.15 to get it in
+      // Kelvin... 35 is the
+      // salinity
 
-        heatflux(i, j) = cc.meltFactor * cc.rhow * cc.c_p_ocean * cc.gamma_T_o *
-          (Toc(i, j) - T_f); // in W/m^2
-        basalmeltrate_shelf(i, j) = heatflux(i, j) / (cc.latentHeat * cc.rhoi); // in m s-1
+      heatflux(i, j) = cc.meltFactor * cc.rhow * cc.c_p_ocean * cc.gamma_T_o * (Toc(i, j) - T_f); // in W/m^2
+      basalmeltrate_shelf(i, j) = heatflux(i, j) / (cc.latentHeat * cc.rhoi);                     // in m s-1
 
-      } else if (shelf_id > 0.0) {
+    } else if (shelf_id > 0.0) {
 
-        Toc(i, j) = 273.15 + Toc_inCelsius(i, j) + Toc_anomaly(i, j); // in K
-        // FIXME I think Toc should not occur in any of the routines before!
+      Toc(i, j) = 273.15 + Toc_inCelsius(i, j) + Toc_anomaly(i, j); // in Kelvin
+      // FIXME I think Toc should not occur in any of the routines before!
 
-      } else { // This must not happen
+    } else { // This must not happen
 
-        m_log->message(2, "PISM_ERROR: [rank %d] at %d, %d  -- basins(i, j)=%d "
-                       "causes problems.\n   Aborting... \n",
-                       grid.rank, i, j, shelf_id);
-        PISMEnd();
-      }
-    } // end j
-  }   // end i
+      m_log->message(2, "PISM_ERROR: [rank %d] at %d, %d  -- basins(i, j)=%d causes problems.\n   Aborting... \n",
+                     grid.rank, i, j, shelf_id);
+      PISMEnd();
+    }
+  } // end of loop over grid points
 }
 
 void BoxModel::shelf_base_temperature(IceModelVec2S &result) {
@@ -1396,70 +1285,29 @@ void BoxModel::melange_back_pressure_fraction(IceModelVec2S &result) {
   result.set(0.0);
 }
 
+void BoxModel::define_variables(std::set<std::string> vars, const PIO &nc, IO_Type nctype) {
+
+  PGivenClimate<POModifier, OceanModel>::define_variables(vars, nc, nctype);
+
+  for (unsigned int k = 0; k < m_variables.size(); ++k) {
+    IceModelVec *v = m_variables[k];
+    std::string name = v->metadata().get_string("short_name");
+    if (set_contains(vars, name)) {
+      v->define(nc, nctype);
+    }
+  }
+}
+
 void BoxModel::write_variables(std::set<std::string> vars, const PIO &nc) {
 
   PGivenClimate<POModifier, OceanModel>::write_variables(vars, nc);
 
-  if (set_contains(vars, "shelfbtemp")) {
-    shelfbtemp.write(nc);
-  }
-
-  if (set_contains(vars, "shelfbmassflux")) {
-    shelfbmassflux.write(nc);
-  }
-
-  if (set_contains(vars, "BOXMODELmask")) {
-    BOXMODELmask.write(nc);
-  }
-
-  if (set_contains(vars, "OCEANMEANmask")) {
-    OCEANMEANmask.write(nc);
-  }
-
-  if (exicerises_set) {
-    if (set_contains(vars, "ICERISESmask")) {
-      ICERISESmask.write(nc);
+  for (unsigned int k = 0; k < m_variables.size(); ++k) {
+    IceModelVec *v = m_variables[k];
+    std::string name = v->metadata().get_string("short_name");
+    if (set_contains(vars, name)) {
+      v->write(nc);
     }
-  }
-
-  if (set_contains(vars, "Soc")) {
-    Soc.write(nc);
-  }
-
-  if (set_contains(vars, "Soc_base")) {
-    Soc_base.write(nc);
-  }
-
-  if (set_contains(vars, "Toc")) {
-    Toc.write(nc);
-  }
-
-  if (set_contains(vars, "Toc_base")) {
-    Toc_base.write(nc);
-  }
-
-  if (set_contains(vars, "Toc_inCelsius")) {
-    Toc_inCelsius.write(nc);
-  }
-
-  if (set_contains(vars, "T_star")) {
-    T_star.write(nc);
-  }
-
-  if (set_contains(vars, "Toc_anomaly")) {
-    Toc_anomaly.write(nc);
-  }
-
-  if (set_contains(vars, "overturning")) {
-    overturning.write(nc);
-  }
-
-  if (set_contains(vars, "heatflux")) {
-    heatflux.write(nc);
-  }
-
-  if (set_contains(vars, "basalmeltrate_shelf")) {
-    basalmeltrate_shelf.write(nc);
   }
 }
 
