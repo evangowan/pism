@@ -41,11 +41,11 @@ void IceModel::view_field(const IceModelVec *field) {
 
   if (field->get_ndof() == 1) {    // scalar fields
     std::string name = field->metadata().get_string("short_name");
-    petsc::Viewer::Ptr viewer = viewers[name];
+    petsc::Viewer::Ptr viewer = m_viewers[name];
 
     if (not viewer) {
-      viewers[name].reset(new petsc::Viewer(m_grid->com, name, viewer_size, m_grid->Lx(), m_grid->Ly()));
-      viewer = viewers[name];
+      m_viewers[name].reset(new petsc::Viewer(m_grid->com, name, viewer_size, m_grid->Lx(), m_grid->Ly()));
+      viewer = m_viewers[name];
     }
 
     const IceModelVec2S *v2d = dynamic_cast<const IceModelVec2S*>(field);
@@ -60,17 +60,17 @@ void IceModel::view_field(const IceModelVec *field) {
       name_1 = field->metadata(0).get_string("short_name"),
       name_2 = field->metadata(1).get_string("short_name");
     petsc::Viewer::Ptr
-      v1 = viewers[name_1],
-      v2 = viewers[name_2];
+      v1 = m_viewers[name_1],
+      v2 = m_viewers[name_2];
 
     if (not v1) {
-      viewers[name_1].reset(new petsc::Viewer(m_grid->com, name_1, viewer_size, m_grid->Lx(), m_grid->Ly()));
-      v1 = viewers[name_1];
+      m_viewers[name_1].reset(new petsc::Viewer(m_grid->com, name_1, viewer_size, m_grid->Lx(), m_grid->Ly()));
+      v1 = m_viewers[name_1];
     }
 
     if (not v2) {
-      viewers[name_2].reset(new petsc::Viewer(m_grid->com, name_2, viewer_size, m_grid->Lx(), m_grid->Ly()));
-      v2 = viewers[name_2];
+      m_viewers[name_2].reset(new petsc::Viewer(m_grid->com, name_2, viewer_size, m_grid->Lx(), m_grid->Ly()));
+      v2 = m_viewers[name_2];
     }
 
     const IceModelVec2 *v2d = dynamic_cast<const IceModelVec2*>(field);

@@ -33,6 +33,17 @@
 namespace pism {
 namespace stressbalance {
 
+ShallowStressBalanceInputs::ShallowStressBalanceInputs() {
+  sea_level             = 0.0;
+  melange_back_pressure = NULL;
+  ice_thickness         = NULL;
+  bed_elevation         = NULL;
+  surface_elevation     = NULL;
+  driving_stress_x      = NULL;
+  driving_stress_y      = NULL;
+  ice_enthalpy          = NULL;
+}
+
 using pism::mask::ice_free;
 
 ShallowStressBalance::ShallowStressBalance(IceGrid::ConstPtr g)
@@ -140,9 +151,8 @@ ZeroSliding::~ZeroSliding() {
 }
 
 //! \brief Update the trivial shallow stress balance object.
-void ZeroSliding::update(bool fast, double sea_level, const IceModelVec2S &melange_back_pressure) {
-  (void) sea_level;
-  (void) melange_back_pressure;
+void ZeroSliding::update(bool fast, const ShallowStressBalanceInputs &inputs) {
+  (void) inputs;
 
   if (not fast) {
     m_velocity.set(0.0);
@@ -460,10 +470,9 @@ PrescribedSliding::~PrescribedSliding() {
   // empty
 }
 
-void PrescribedSliding::update(bool fast, double sea_level,
-                               const IceModelVec2S &melange_back_pressure) {
-  (void) sea_level;
-  (void) melange_back_pressure;
+void PrescribedSliding::update(bool fast, const ShallowStressBalanceInputs &inputs) {
+  (void) inputs;
+
   if (not fast) {
     m_basal_frictional_heating.set(0.0);
   }

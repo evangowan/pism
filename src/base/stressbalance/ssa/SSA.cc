@@ -73,11 +73,7 @@ double SSAStrengthExtension::get_min_thickness() const {
 SSA::SSA(IceGrid::ConstPtr g)
   : ShallowStressBalance(g)
 {
-  m_thickness = NULL;
   m_tauc = NULL;
-  m_surface = NULL;
-  m_bed = NULL;
-  m_ice_enthalpy = NULL;
   m_gl_mask = NULL;
 
   strength_extension = new SSAStrengthExtension(*m_config);
@@ -149,17 +145,7 @@ void SSA::init_impl() {
     m_gl_mask = m_grid->variables().get_2d_scalar("gl_mask");
   }
 
-  m_thickness = m_grid->variables().get_2d_scalar("land_ice_thickness");
   m_tauc      = m_grid->variables().get_2d_scalar("tauc");
-
-  try {
-    m_surface = m_grid->variables().get_2d_scalar("surface_altitude");
-  } catch (RuntimeError) {
-    m_surface = NULL;
-  }
-
-  m_bed      = m_grid->variables().get_2d_scalar("bedrock_altitude");
-  m_ice_enthalpy = m_grid->variables().get_3d_scalar("enthalpy");
 
   InputOptions opts = process_input_options(m_grid->com);
 
@@ -193,10 +179,7 @@ void SSA::init_impl() {
 }
 
 //! \brief Update the SSA solution.
-void SSA::update(bool fast, double sea_level, const IceModelVec2S &melange_back_pressure) {
-
-  m_sea_level = sea_level;
-  (void) melange_back_pressure;
+void SSA::update(bool fast, const ShallowStressBalanceInputs &inputs) {
 
   // update the cell type mask using the ice-free thickness threshold for stress balance
   // computations
@@ -205,11 +188,11 @@ void SSA::update(bool fast, double sea_level, const IceModelVec2S &melange_back_
     GeometryCalculator gc(*m_config);
     gc.set_icefree_thickness(H_threshold);
 
-    gc.compute_mask(sea_level, *m_bed, *m_thickness, m_mask);
+    gc.compute_mask(inputs.sea_level, *inputs.bed_elevation, *inputs.ice_thickness, m_mask);
   }
 
   if (not fast) {
-    solve();
+    solve(inputs);
     compute_basal_frictional_heating(m_velocity, *m_tauc, m_mask,
                                      m_basal_frictional_heating);
   }
@@ -228,8 +211,11 @@ surface gradient. When the thickness at a grid point is very small (below \c
 minThickEtaTransform in the procedure), the formula is slightly modified to
 give a lower driving stress. The transformation is not used in floating ice.
  */
-void SSA::compute_driving_stress(IceModelVec2V &result) const {
-  const IceModelVec2S &thk = *m_thickness; // to improve readability (below)
+void SSA::compute_driving_stress(const ShallowStressBalanceInputs &inputs, IceModelVec2V &result) const {
+  // shortcuts to improve readability (below)
+  const IceModelVec2S &thk     = *inputs.ice_thickness;
+  const IceModelVec2S &bed     = *inputs.bed_elevation;
+  const IceModelVec2S &surface = *inputs.surface_elevation;
 
   const double n = m_flow_law->exponent(), // frequently n = 3
     etapow  = (2.0 * n + 2.0)/n,  // = 8/3 if n = 3
@@ -243,8 +229,8 @@ void SSA::compute_driving_stress(IceModelVec2V &result) const {
   bool use_eta = (m_config->get_string("stress_balance.sia.surface_gradient_method") == "eta");
 
   IceModelVec::AccessList list;
-  list.add(*m_surface);
-  list.add(*m_bed);
+  list.add(surface);
+  list.add(bed);
   list.add(m_mask);
   list.add(thk);
   list.add(result);
@@ -270,13 +256,13 @@ void SSA::compute_driving_stress(IceModelVec2V &result) const {
         }
         // now add bed slope to get actual h_x,h_y
         // FIXME: there is no reason to assume user's bed is periodized
-        h_x += m_bed->diff_x(i,j);
-        h_y += m_bed->diff_y(i,j);
+        h_x += bed.diff_x(i,j);
+        h_y += bed.diff_y(i,j);
       } else {  // floating or eta transformation is not used
         if (compute_surf_grad_inward_ssa) {
           // Special case for verification tests.
-          h_x = m_surface->diff_x_p(i,j);
-          h_y = m_surface->diff_y_p(i,j);
+          h_x = surface.diff_x_p(i,j);
+          h_y = surface.diff_y_p(i,j);
         } else {              // general case
 
           // To compute the x-derivative we use
@@ -320,8 +306,8 @@ void SSA::compute_driving_stress(IceModelVec2V &result) const {
             }
 
             if (east + west > 0) {
-              h_x = 1.0 / (west + east) * (west * m_surface->diff_x_stagE(i-1,j) +
-                                           east * m_surface->diff_x_stagE(i,j));
+              h_x = 1.0 / (west + east) * (west * surface.diff_x_stagE(i-1,j) +
+                                           east * surface.diff_x_stagE(i,j));
             } else {
               h_x = 0.0;
             }
@@ -353,8 +339,8 @@ void SSA::compute_driving_stress(IceModelVec2V &result) const {
             }
 
             if (north + south > 0) {
-              h_y = 1.0 / (south + north) * (south * m_surface->diff_y_stagN(i,j-1) +
-                                             north * m_surface->diff_y_stagN(i,j));
+              h_y = 1.0 / (south + north) * (south * surface.diff_y_stagN(i,j-1) +
+                                             north * surface.diff_y_stagN(i,j));
             } else {
               h_y = 0.0;
             }
@@ -426,7 +412,9 @@ IceModelVec::Ptr SSA_taud::compute_impl() {
   result->metadata(0) = m_vars[0];
   result->metadata(1) = m_vars[1];
 
-  model->compute_driving_stress(*result);
+  ShallowStressBalanceInputs inputs;
+  // FIXME: this will segfault
+  model->compute_driving_stress(inputs, *result);
 
   return result;
 }

@@ -166,8 +166,10 @@ void SSATestCase::run() {
   m_ctx->log()->message(2, "* Solving the SSA stress balance ...\n");
 
   bool fast = false;
-  double sea_level = 0.0;
-  m_ssa->update(fast, sea_level, m_melange_back_pressure);
+  ShallowStressBalanceInputs inputs;
+  inputs.sea_level = 0.0;
+  inputs.melange_back_pressure = &m_melange_back_pressure;
+  m_ssa->update(fast, inputs);
 }
 
 //! Report on the generated solution

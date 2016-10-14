@@ -66,11 +66,6 @@ void StressBalance::init() {
   m_modifier->init();
 }
 
-void StressBalance::set_boundary_conditions(const IceModelVec2Int &locations,
-                                            const IceModelVec2V &velocities) {
-  m_shallow_stress_balance->set_boundary_conditions(locations, velocities);
-}
-
 //! \brief Set the basal melt rate. (If not NULL, it will be included in the
 //! computation of the vertical valocity).
 void StressBalance::set_basal_melt_rate(const IceModelVec2S &bmr_input) {
@@ -85,7 +80,10 @@ void StressBalance::update(bool fast, double sea_level,
 
   try {
     profiling.begin("SSB");
-    m_shallow_stress_balance->update(fast, sea_level, melange_back_pressure);
+    ShallowStressBalanceInputs inputs;
+    inputs.sea_level = sea_level;
+    inputs.melange_back_pressure = &melange_back_pressure;
+    m_shallow_stress_balance->update(fast, inputs);
     profiling.end("SSB");
 
     profiling.begin("SB modifier");

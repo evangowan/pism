@@ -45,7 +45,7 @@ public:
 
 protected:
   virtual void init_impl();
-  void cache_inputs();
+  void cache_inputs(const ShallowStressBalanceInputs &inputs);
 
   //! Storage for SSA coefficients at element nodes.
   //!
@@ -102,9 +102,9 @@ protected:
 
   void compute_local_jacobian(Vector2 const *const *const velocity, Mat J);
 
-  virtual void solve();
+  virtual void solve(const ShallowStressBalanceInputs &inputs);
 
-  TerminationReason::Ptr solve_with_reason();
+  TerminationReason::Ptr solve_with_reason(const ShallowStressBalanceInputs &inputs);
 
   TerminationReason::Ptr solve_nocache();
 
@@ -133,17 +133,14 @@ protected:
   double m_beta_ice_free_bedrock;
   double m_epsilon_ssa;
 
+  bool m_use_explicit_driving_stress;
+
   fem::ElementIterator m_element_index;
   fem::ElementMap m_element;
   fem::Q1Quadrature4 m_quadrature;
 
-  // Support for direct specification of driving stress to the FEM SSA solver. This helps
-  // with certain test cases where the grid is periodic but the driving stress cannot be the
-  // gradient of a periodic function. (See commit ffb4be16.)
-  const IceModelVec2S *m_driving_stress_x;
-  const IceModelVec2S *m_driving_stress_y;
 private:
-  void cache_residual_cfbc();
+  void cache_residual_cfbc(const ShallowStressBalanceInputs &inputs);
   void monitor_jacobian(Mat Jac);
   void monitor_function(Vector2 const *const *const velocity_global,
                         Vector2 const *const *const residual_global);

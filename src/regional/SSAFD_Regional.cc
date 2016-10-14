@@ -44,9 +44,10 @@ void SSAFD_Regional::init() {
   }
 }
 
-void SSAFD_Regional::compute_driving_stress(IceModelVec2V &result) const {
+void SSAFD_Regional::compute_driving_stress(const ShallowStressBalanceInputs &inputs,
+                                            IceModelVec2V &result) const {
 
-  SSAFD::compute_driving_stress(result);
+  SSAFD::compute_driving_stress(inputs, result);
 
   const IceModelVec2Int &nmm = *m_grid->variables().get_2d_mask("no_model_mask");
 

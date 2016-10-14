@@ -112,13 +112,13 @@ public:
 
   SSAStrengthExtension *strength_extension;
 
-  virtual void update(bool fast, double sea_level, const IceModelVec2S &melange_back_pressure);
+  virtual void update(bool fast, const ShallowStressBalanceInputs &inputs);
 
   void set_initial_guess(const IceModelVec2V &guess);
 
   virtual std::string stdout_report() const;
 
-  virtual void compute_driving_stress(IceModelVec2V &taud) const;
+  virtual void compute_driving_stress(const ShallowStressBalanceInputs &inputs, IceModelVec2V &result) const;
 
 protected:
   virtual void define_model_state_impl(const PIO &output) const;
@@ -129,18 +129,15 @@ protected:
   virtual void get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
                                     std::map<std::string, TSDiagnostic::Ptr> &ts_dict) const;
 
-  virtual void solve() = 0;
+  virtual void solve(const ShallowStressBalanceInputs &inputs) = 0;
 
   double ocean_pressure_difference(bool shelf, bool dry_mode, double H, double bed, double sea_level,
                                    double rho_ice, double rho_ocean, double g);
 
   IceModelVec2CellType m_mask;
-  const IceModelVec2S *m_thickness;
   const IceModelVec2S *m_tauc;
-  const IceModelVec2S *m_surface;
-  const IceModelVec2S *m_bed;
   IceModelVec2V m_taud;
-  const IceModelVec3 *m_ice_enthalpy;
+
   const IceModelVec2S *m_gl_mask;
 
   std::string m_stdout_ssa;

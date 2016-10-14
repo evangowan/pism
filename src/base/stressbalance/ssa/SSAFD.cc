@@ -222,13 +222,6 @@ void SSAFD::pc_setup_asm() {
 void SSAFD::init_impl() {
   SSA::init_impl();
 
-  // The FD solver does not support direct specification of a driving stress;
-  // a surface elevation must be explicitly given.
-  if (m_surface == NULL) {
-    throw RuntimeError(PISM_ERROR_LOCATION, "The finite difference SSA solver requires a surface elevation.\n"
-                       "An explicit driving stress was specified instead and cannot be used.");
-  }
-
   m_log->message(2,
              "  [using the KSP-based finite difference implementation]\n");
 
@@ -258,10 +251,17 @@ void SSAFD::init_impl() {
   }
 }
 
-void SSAFD::update(bool fast, double sea_level, const IceModelVec2S& melange_back_pressure) {
-  m_melange_back_pressure = &melange_back_pressure;
+void SSAFD::update(bool fast, const ShallowStressBalanceInputs &inputs) {
+  m_melange_back_pressure = inputs.melange_back_pressure;
 
-  SSA::update(fast, sea_level, melange_back_pressure);
+  // The FD solver does not support direct specification of a driving stress;
+  // a surface elevation must be explicitly given.
+  if (inputs.surface_elevation == NULL) {
+    throw RuntimeError(PISM_ERROR_LOCATION, "The finite difference SSA solver requires a surface elevation.\n"
+                       "An explicit driving stress was specified instead and cannot be used.");
+  }
+
+  SSA::update(fast, inputs);
 }
 
 //! \brief Computes the right-hand side ("rhs") of the linear problem for the
@@ -280,7 +280,7 @@ In the case of Dirichlet boundary conditions, the entries on the right-hand side
 come from known velocity values.  The fields m_bc_values and m_bc_mask are used for
 this.
  */
-void SSAFD::assemble_rhs() {
+void SSAFD::assemble_rhs(const ShallowStressBalanceInputs &inputs) {
   const double dx = m_grid->dx(), dy = m_grid->dy();
 
   const double ice_free_default_velocity = 0.0;
@@ -297,7 +297,7 @@ void SSAFD::assemble_rhs() {
   m_b.set(0.0);
 
   // get driving stress components
-  compute_driving_stress(m_taud);
+  compute_driving_stress(inputs, m_taud);
 
   IceModelVec::AccessList list;
   list.add(m_taud);
@@ -309,8 +309,8 @@ void SSAFD::assemble_rhs() {
   }
 
   if (use_cfbc) {
-    list.add(*m_thickness);
-    list.add(*m_bed);
+    list.add(*inputs.ice_thickness);
+    list.add(*inputs.bed_elevation);
     list.add(m_mask);
   }
 
@@ -329,7 +329,7 @@ void SSAFD::assemble_rhs() {
     }
 
     if (use_cfbc) {
-      double H_ij = (*m_thickness)(i,j);
+      double H_ij = (*inputs.ice_thickness)(i,j);
       int M_ij = m_mask.as_int(i,j),
         M_e = m_mask.as_int(i + 1,j),
         M_w = m_mask.as_int(i - 1,j),
@@ -370,7 +370,7 @@ void SSAFD::assemble_rhs() {
         }
 
         double ocean_pressure = ocean_pressure_difference(ocean(M_ij), is_dry_simulation,
-                                                          H_ij, (*m_bed)(i,j), m_sea_level,
+                                                          H_ij, (*inputs.bed_elevation)(i,j), m_sea_level,
                                                           rho_ice, rho_ocean, standard_gravity);
 
         if (m_melange_back_pressure != NULL) {
@@ -478,7 +478,7 @@ the second equation we also have 13 nonzeros per row.
 FIXME:  document use of DAGetMatrix and MatStencil and MatSetValuesStencil
 
 */
-void SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
+void SSAFD::assemble_matrix(const ShallowStressBalanceInputs &inputs, bool include_basal_shear, Mat A) {
   PetscErrorCode  ierr;
 
   const double   dx=m_grid->dx(), dy=m_grid->dy();
@@ -515,9 +515,9 @@ void SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
   // handles friction of the ice cell along ice-free bedrock margins when bedrock higher than ice surface (in simplified setups)
   bool lateral_drag_enabled=m_config->get_boolean("stress_balance.ssa.fd.lateral_drag.enabled");
   if (lateral_drag_enabled) {
-    list.add(*m_thickness);
-    list.add(*m_bed);
-    list.add(*m_surface);
+    list.add(*inputs.ice_thickness);
+    list.add(*inputs.bed_elevation);
+    list.add(*inputs.surface_elevation);
   }
   double lateral_drag_viscosity=m_config->get_double("stress_balance.ssa.fd.lateral_drag.viscosity");
   double HminFrozen=0.0;
@@ -556,18 +556,18 @@ void SSAFD::assemble_matrix(bool include_basal_shear, Mat A) {
           M_n = m_mask.as_int(i,j + 1),
           M_s = m_mask.as_int(i,j - 1);
 
-        if ((*m_thickness)(i,j) > HminFrozen) {
-          if ((*m_bed)(i-1,j) > (*m_surface)(i,j) && ice_free_land(M_w)) {
-            c_w = lateral_drag_viscosity * 0.5 * ((*m_thickness)(i,j)+(*m_thickness)(i-1,j));
+        if ((*inputs.ice_thickness)(i,j) > HminFrozen) {
+          if ((*inputs.bed_elevation)(i-1,j) > (*inputs.surface_elevation)(i,j) && ice_free_land(M_w)) {
+            c_w = lateral_drag_viscosity * 0.5 * ((*inputs.ice_thickness)(i,j)+(*inputs.ice_thickness)(i-1,j));
           }
-          if ((*m_bed)(i+1,j) > (*m_surface)(i,j) && ice_free_land(M_e)) {
-            c_e = lateral_drag_viscosity * 0.5 * ((*m_thickness)(i,j)+(*m_thickness)(i+1,j));
+          if ((*inputs.bed_elevation)(i+1,j) > (*inputs.surface_elevation)(i,j) && ice_free_land(M_e)) {
+            c_e = lateral_drag_viscosity * 0.5 * ((*inputs.ice_thickness)(i,j)+(*inputs.ice_thickness)(i+1,j));
           }
-          if ((*m_bed)(i,j+1) > (*m_surface)(i,j) && ice_free_land(M_n)) {
-            c_n = lateral_drag_viscosity * 0.5 * ((*m_thickness)(i,j)+(*m_thickness)(i,j+1));
+          if ((*inputs.bed_elevation)(i,j+1) > (*inputs.surface_elevation)(i,j) && ice_free_land(M_n)) {
+            c_n = lateral_drag_viscosity * 0.5 * ((*inputs.ice_thickness)(i,j)+(*inputs.ice_thickness)(i,j+1));
           }
-          if ((*m_bed)(i,j-1) > (*m_surface)(i,j) && ice_free_land(M_s)) {
-            c_s = lateral_drag_viscosity * 0.5 * ((*m_thickness)(i,j)+(*m_thickness)(i+1,j));
+          if ((*inputs.bed_elevation)(i,j-1) > (*inputs.surface_elevation)(i,j) && ice_free_land(M_s)) {
+            c_s = lateral_drag_viscosity * 0.5 * ((*inputs.ice_thickness)(i,j)+(*inputs.ice_thickness)(i+1,j));
           }
         }
       }
@@ -861,7 +861,7 @@ but it may be worthwhile.  Note the user can already do `-pc_type asm
 
 FIXME: update this doxygen comment
 */
-void SSAFD::solve() {
+void SSAFD::solve(const ShallowStressBalanceInputs &inputs) {
 
   // Store away old SSA velocity (it might be needed in case a solver
   // fails).
@@ -870,15 +870,15 @@ void SSAFD::solve() {
   // These computations do not depend on the solution, so they need to
   // be done once.
   {
-    assemble_rhs();
-    compute_hardav_staggered();
+    assemble_rhs(inputs);
+    compute_hardav_staggered(inputs);
   }
 
   for (unsigned int k = 0; k < 3; ++k) {
     try {
       if (k == 0) {
         // default strategy
-        picard_iteration(m_config->get_double("stress_balance.ssa.epsilon"), 1.0);
+        picard_iteration(inputs, m_config->get_double("stress_balance.ssa.epsilon"), 1.0);
 
         break;
       } else if (k == 1) {
@@ -887,12 +887,12 @@ void SSAFD::solve() {
         m_log->message(1,
                    "  re-trying with effective viscosity under-relaxation (parameter = %.2f) ...\n",
                    underrelax);
-        picard_iteration(m_config->get_double("stress_balance.ssa.epsilon"), underrelax);
+        picard_iteration(inputs, m_config->get_double("stress_balance.ssa.epsilon"), underrelax);
 
         break;
       } else if (k == 2) {
         // try over-regularization
-        picard_strategy_regularization();
+        picard_strategy_regularization(inputs);
 
         break;
       } else {
@@ -918,7 +918,8 @@ void SSAFD::solve() {
   }
 }
 
-void SSAFD::picard_iteration(double nuH_regularization,
+void SSAFD::picard_iteration(const ShallowStressBalanceInputs &inputs,
+                             double nuH_regularization,
                              double nuH_iter_failure_underrelax) {
 
   if (m_default_pc_failure_count < m_default_pc_failure_max_count) {
@@ -926,7 +927,8 @@ void SSAFD::picard_iteration(double nuH_regularization,
 
     try {
       pc_setup_bjacobi();
-      picard_manager(nuH_regularization,
+      picard_manager(inputs,
+                     nuH_regularization,
                      nuH_iter_failure_underrelax);
 
     } catch (KSPFailure) {
@@ -940,7 +942,7 @@ void SSAFD::picard_iteration(double nuH_regularization,
 
       m_velocity.copy_from(m_velocity_old);
 
-      picard_manager(nuH_regularization,
+      picard_manager(inputs, nuH_regularization,
                      nuH_iter_failure_underrelax);
     }
 
@@ -948,13 +950,14 @@ void SSAFD::picard_iteration(double nuH_regularization,
     // otherwise use ASM
     pc_setup_asm();
 
-    picard_manager(nuH_regularization,
+    picard_manager(inputs, nuH_regularization,
                    nuH_iter_failure_underrelax);
   }
 }
 
 //! \brief Manages the Picard iteration loop.
-void SSAFD::picard_manager(double nuH_regularization,
+void SSAFD::picard_manager(const ShallowStressBalanceInputs &inputs,
+                           double nuH_regularization,
                            double nuH_iter_failure_underrelax) {
   PetscErrorCode ierr;
   double   nuH_norm, nuH_norm_change;
@@ -977,9 +980,9 @@ void SSAFD::picard_manager(double nuH_regularization,
   bool use_cfbc = m_config->get_boolean("stress_balance.calving_front_stress_bc");
 
   if (use_cfbc == true) {
-    compute_nuH_staggered_cfbc(m_nuH, nuH_regularization);
+    compute_nuH_staggered_cfbc(inputs, m_nuH, nuH_regularization);
   } else {
-    compute_nuH_staggered(m_nuH, nuH_regularization);
+    compute_nuH_staggered(inputs, m_nuH, nuH_regularization);
   }
   update_nuH_viewers();
 
@@ -995,7 +998,7 @@ void SSAFD::picard_manager(double nuH_regularization,
     m_nuH_old.copy_from(m_nuH);
 
     // assemble (or re-assemble) matrix, which depends on updated viscosity
-    assemble_matrix(true, m_A);
+    assemble_matrix(inputs, true, m_A);
 
     if (very_verbose) {
 
@@ -1048,9 +1051,9 @@ void SSAFD::picard_manager(double nuH_regularization,
 
     // update viscosity and check for viscosity convergence
     if (use_cfbc == true) {
-      compute_nuH_staggered_cfbc(m_nuH, nuH_regularization);
+      compute_nuH_staggered_cfbc(inputs, m_nuH, nuH_regularization);
     } else {
-      compute_nuH_staggered(m_nuH, nuH_regularization);
+      compute_nuH_staggered(inputs, m_nuH, nuH_regularization);
     }
 
     if (nuH_iter_failure_underrelax != 1.0) {
@@ -1114,7 +1117,7 @@ void SSAFD::picard_manager(double nuH_regularization,
 }
 
 //! Old SSAFD recovery strategy: increase the SSA regularization parameter.
-void SSAFD::picard_strategy_regularization() {
+void SSAFD::picard_strategy_regularization(const ShallowStressBalanceInputs &inputs) {
   // this has no units; epsilon goes up by this ratio when previous value failed
   const double DEFAULT_EPSILON_MULTIPLIER_SSA = 4.0;
   double nuH_regularization = m_config->get_double("stress_balance.ssa.epsilon");
@@ -1135,7 +1138,7 @@ void SSAFD::picard_strategy_regularization() {
 
     try {
       // 1.0 is the under-relaxation parameter
-      picard_iteration(nuH_regularization, 1.0);
+      picard_iteration(inputs, nuH_regularization, 1.0);
       // if this call succeeded, stop over-regularizing
       break;
     }
@@ -1184,14 +1187,14 @@ void SSAFD::compute_nuH_norm(double &norm, double &norm_change) {
 }
 
 //! \brief Computes vertically-averaged ice hardness on the staggered grid.
-void SSAFD::compute_hardav_staggered() {
+void SSAFD::compute_hardav_staggered(const ShallowStressBalanceInputs &inputs) {
   const double *E_ij, *E_offset;
 
   std::vector<double> E(m_grid->Mz());
 
   IceModelVec::AccessList list;
-  list.add(*m_thickness);
-  list.add(*m_ice_enthalpy);
+  list.add(*inputs.ice_thickness);
+  list.add(*inputs.ice_enthalpy);
   list.add(m_hardness);
   list.add(m_mask);
 
@@ -1200,17 +1203,17 @@ void SSAFD::compute_hardav_staggered() {
     for (Points p(*m_grid); p; p.next()) {
       const int i = p.i(), j = p.j();
 
-      E_ij = m_ice_enthalpy->get_column(i,j);
+      E_ij = inputs.ice_enthalpy->get_column(i,j);
       for (int o=0; o<2; o++) {
         const int oi = 1-o, oj=o;
         double H;
 
         if (m_mask.icy(i,j) && m_mask.icy(i+oi,j+oj)) {
-          H = 0.5 * ((*m_thickness)(i,j) + (*m_thickness)(i+oi,j+oj));
+          H = 0.5 * ((*inputs.ice_thickness)(i,j) + (*inputs.ice_thickness)(i+oi,j+oj));
         } else if (m_mask.icy(i,j)) {
-          H = (*m_thickness)(i,j);
+          H = (*inputs.ice_thickness)(i,j);
         }  else {
-          H = (*m_thickness)(i+oi,j+oj);
+          H = (*inputs.ice_thickness)(i+oi,j+oj);
         }
 
         if (H == 0) {
@@ -1218,7 +1221,7 @@ void SSAFD::compute_hardav_staggered() {
           continue;
         }
 
-        E_offset = m_ice_enthalpy->get_column(i+oi,j+oj);
+        E_offset = inputs.ice_enthalpy->get_column(i+oi,j+oj);
         // build a column of enthalpy values a the current location:
         for (unsigned int k = 0; k < m_grid->Mz(); ++k) {
           E[k] = 0.5 * (E_ij[k] + E_offset[k]);
@@ -1350,8 +1353,9 @@ In this implementation we set \f$\nu H\f$ to a constant anywhere the ice is
 thinner than a certain minimum. See SSAStrengthExtension and compare how this
 issue is handled when -cfbc is set.
 */
-void SSAFD::compute_nuH_staggered(IceModelVec2Stag &result,
-                                            double nuH_regularization) {
+void SSAFD::compute_nuH_staggered(const ShallowStressBalanceInputs &inputs,
+                                  IceModelVec2Stag &result,
+                                  double nuH_regularization) {
 
   IceModelVec2V &uv = m_velocity; // shortcut
 
@@ -1359,7 +1363,7 @@ void SSAFD::compute_nuH_staggered(IceModelVec2Stag &result,
   list.add(result);
   list.add(uv);
   list.add(m_hardness);
-  list.add(*m_thickness);
+  list.add(*inputs.ice_thickness);
 
   double ssa_enhancement_factor = m_flow_law->enhancement_factor(),
     n_glen = m_flow_law->exponent(),
@@ -1372,7 +1376,7 @@ void SSAFD::compute_nuH_staggered(IceModelVec2Stag &result,
     for (Points p(*m_grid); p; p.next()) {
       const int i = p.i(), j = p.j();
 
-      const double H = 0.5 * ((*m_thickness)(i,j) + (*m_thickness)(i+oi,j+oj));
+      const double H = 0.5 * ((*inputs.ice_thickness)(i,j) + (*inputs.ice_thickness)(i+oi,j+oj));
 
       if (H < strength_extension->get_min_thickness()) {
         result(i,j,o) = strength_extension->get_notional_strength();
@@ -1433,8 +1437,9 @@ void SSAFD::compute_nuH_staggered(IceModelVec2Stag &result,
  *
  * @return 0 on success
  */
-void SSAFD::compute_nuH_staggered_cfbc(IceModelVec2Stag &result,
-                                                 double nuH_regularization) {
+void SSAFD::compute_nuH_staggered_cfbc(const ShallowStressBalanceInputs &inputs,
+                                       IceModelVec2Stag &result,
+                                       double nuH_regularization) {
   IceModelVec2V &uv = m_velocity; // shortcut
   double ssa_enhancement_factor = m_flow_law->enhancement_factor(),
     n_glen = m_flow_law->exponent(),
@@ -1485,7 +1490,7 @@ void SSAFD::compute_nuH_staggered_cfbc(IceModelVec2Stag &result,
 
   list.add(result);
   list.add(m_hardness);
-  list.add(*m_thickness);
+  list.add(*inputs.ice_thickness);
 
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
@@ -1494,12 +1499,12 @@ void SSAFD::compute_nuH_staggered_cfbc(IceModelVec2Stag &result,
     // i-offset
     {
       if (m_mask.icy(i,j) && m_mask.icy(i+1,j)) {
-        H = 0.5 * ((*m_thickness)(i,j) + (*m_thickness)(i+1,j));
+        H = 0.5 * ((*inputs.ice_thickness)(i,j) + (*inputs.ice_thickness)(i+1,j));
       }
       else if (m_mask.icy(i,j)) {
-        H = (*m_thickness)(i,j);
+        H = (*inputs.ice_thickness)(i,j);
       } else {
-        H = (*m_thickness)(i+1,j);
+        H = (*inputs.ice_thickness)(i+1,j);
       }
 
       if (H >= strength_extension->get_min_thickness()) {
@@ -1530,11 +1535,11 @@ void SSAFD::compute_nuH_staggered_cfbc(IceModelVec2Stag &result,
     // j-offset
     {
       if (m_mask.icy(i,j) && m_mask.icy(i,j+1)) {
-        H = 0.5 * ((*m_thickness)(i,j) + (*m_thickness)(i,j+1));
+        H = 0.5 * ((*inputs.ice_thickness)(i,j) + (*inputs.ice_thickness)(i,j+1));
       } else if (m_mask.icy(i,j)) {
-        H = (*m_thickness)(i,j);
+        H = (*inputs.ice_thickness)(i,j);
       } else {
-        H = (*m_thickness)(i,j+1);
+        H = (*inputs.ice_thickness)(i,j+1);
       }
 
       if (H >= strength_extension->get_min_thickness()) {

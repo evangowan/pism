@@ -39,17 +39,14 @@ namespace stressbalance {
 SSAFEM::SSAFEM(IceGrid::ConstPtr g)
   : SSA(g),
     m_gc(*m_config),
+    m_use_explicit_driving_stress(false),
     m_element_index(*g),
     m_element(*g),
     m_quadrature(g->dx(), g->dy(), 1.0) {
 
-
   const double ice_density = m_config->get_double("constants.ice.density");
   m_alpha = 1 - ice_density / m_config->get_double("constants.sea_water.density");
   m_rho_g = ice_density * m_config->get_double("constants.standard_gravity");
-
-  m_driving_stress_x = NULL;
-  m_driving_stress_y = NULL;
 
   PetscErrorCode ierr;
 
@@ -135,12 +132,6 @@ void SSAFEM::init_impl() {
 
   SSA::init_impl();
 
-  // Use explicit driving stress if the surface elevation is not available.
-  if (m_surface == NULL) {
-    m_driving_stress_x = m_grid->variables().get_2d_scalar("ssa_driving_stress_x");
-    m_driving_stress_y = m_grid->variables().get_2d_scalar("ssa_driving_stress_y");
-  }
-
   m_log->message(2,
                  "  [using the SNES-based finite element method implementation]\n");
 
@@ -161,7 +152,9 @@ void SSAFEM::init_impl() {
   m_velocity_global.copy_from(m_velocity);
 
   // Store coefficient data at the element nodes.
-  cache_inputs();
+  ShallowStressBalanceInputs inputs;
+  // FIXME: this will segfault
+  cache_inputs(inputs);
 }
 
 /**  Solve the SSA system of equations.
@@ -178,9 +171,9 @@ void SSAFEM::init_impl() {
  difference is that SSAFEM::solve() recomputes the cached values of the coefficients before calling
  SSAFEM::solve_nocache().
  */
-void SSAFEM::solve() {
+void SSAFEM::solve(const ShallowStressBalanceInputs &inputs) {
 
-  TerminationReason::Ptr reason = solve_with_reason();
+  TerminationReason::Ptr reason = solve_with_reason(inputs);
   if (reason->failed()) {
     throw RuntimeError::formatted(PISM_ERROR_LOCATION, "SSAFEM solve failed to converge (SNES reason %s)",
                                   reason->description().c_str());
@@ -189,10 +182,10 @@ void SSAFEM::solve() {
   }
 }
 
-TerminationReason::Ptr SSAFEM::solve_with_reason() {
+TerminationReason::Ptr SSAFEM::solve_with_reason(const ShallowStressBalanceInputs &inputs) {
 
   // Set up the system to solve.
-  cache_inputs();
+  cache_inputs(inputs);
 
   return solve_nocache();
 }
@@ -273,20 +266,22 @@ TerminationReason::Ptr SSAFEM::solve_nocache() {
    In addition to coefficients at element nodes we store "node types" used to identify interior
    elements, exterior elements, and boundary faces.
 */
-void SSAFEM::cache_inputs() {
+void SSAFEM::cache_inputs(const ShallowStressBalanceInputs &inputs) {
   const std::vector<double> &z = m_grid->z();
+
+  m_use_explicit_driving_stress = ((inputs.driving_stress_x != NULL) &&
+                                   (inputs.driving_stress_y != NULL));
 
   IceModelVec::AccessList list;
   list.add(m_coefficients);
-  list.add(*m_ice_enthalpy);
-  list.add(*m_thickness);
-  list.add(*m_bed);
+  list.add(*inputs.ice_enthalpy);
+  list.add(*inputs.ice_thickness);
+  list.add(*inputs.bed_elevation);
   list.add(*m_tauc);
 
-  bool use_explicit_driving_stress = (m_driving_stress_x != NULL) && (m_driving_stress_y != NULL);
-  if (use_explicit_driving_stress) {
-    list.add(*m_driving_stress_x);
-    list.add(*m_driving_stress_y);
+  if (m_use_explicit_driving_stress) {
+    list.add(*inputs.driving_stress_x);
+    list.add(*inputs.driving_stress_y);
   }
 
   ParallelSection loop(m_grid->com);
@@ -294,25 +289,25 @@ void SSAFEM::cache_inputs() {
     for (Points p(*m_grid); p; p.next()) {
       const int i = p.i(), j = p.j();
 
-      double thickness = (*m_thickness)(i, j);
+      double thickness = (*inputs.ice_thickness)(i, j);
 
       Vector2 tau_d;
-      if (use_explicit_driving_stress) {
-        tau_d.u = (*m_driving_stress_x)(i, j);
-        tau_d.v = (*m_driving_stress_y)(i, j);
+      if (m_use_explicit_driving_stress) {
+        tau_d.u = (*inputs.driving_stress_x)(i, j);
+        tau_d.v = (*inputs.driving_stress_y)(i, j);
       } else {
 	// tau_d above is set to zero by the Vector2
 	// constructor, but is not used
       }
 
-      const double *enthalpy = m_ice_enthalpy->get_column(i, j);
+      const double *enthalpy = inputs.ice_enthalpy->get_column(i, j);
       double hardness = rheology::averaged_hardness(*m_flow_law, thickness,
                                                     m_grid->kBelowHeight(thickness),
                                                     &z[0], enthalpy);
 
       Coefficients c;
       c.thickness      = thickness;
-      c.bed            = (*m_bed)(i, j);
+      c.bed            = (*inputs.bed_elevation)(i, j);
       c.sea_level      = m_sea_level; // FIXME: use a 2D field
       c.tauc           = (*m_tauc)(i, j);
       c.hardness       = hardness;
@@ -330,14 +325,14 @@ void SSAFEM::cache_inputs() {
   const bool use_cfbc = m_config->get_boolean("stress_balance.calving_front_stress_bc");
   if (use_cfbc) {
     // Note: the call below uses ghosts of m_thickness.
-    compute_node_types(*m_thickness,
+    compute_node_types(*inputs.ice_thickness,
                        m_config->get_double("stress_balance.ice_free_thickness_standard"),
                        m_node_type);
   } else {
     m_node_type.set(NODE_INTERIOR);
   }
 
-  cache_residual_cfbc();
+  cache_residual_cfbc(inputs);
 
 }
 
@@ -550,7 +545,7 @@ void SSAFEM::PointwiseNuHAndBeta(double thickness,
    This method computes FIXME.
 
  */
-void SSAFEM::cache_residual_cfbc() {
+void SSAFEM::cache_residual_cfbc(const ShallowStressBalanceInputs &inputs) {
 
   fem::BoundaryQuadrature2 bq(m_grid->dx(), m_grid->dy(), 1.0);
 
@@ -579,8 +574,8 @@ void SSAFEM::cache_residual_cfbc() {
   }
 
   IceModelVec::AccessList list(m_node_type);
-  list.add(*m_thickness);
-  list.add(*m_bed);
+  list.add(*inputs.ice_thickness);
+  list.add(*inputs.bed_elevation);
   list.add(m_boundary_integral);
 
   // Iterate over the elements.
@@ -615,10 +610,10 @@ void SSAFEM::cache_residual_cfbc() {
         }
 
         double H_nodal[Nk];
-        m_element.nodal_values(*m_thickness, H_nodal);
+        m_element.nodal_values(*inputs.ice_thickness, H_nodal);
 
         double b_nodal[Nk];
-        m_element.nodal_values(*m_bed, b_nodal);
+        m_element.nodal_values(*inputs.bed_elevation, b_nodal);
 
         // storage for test function values psi[0] for the first "end" of a side, psi[1] for the
         // second
@@ -692,8 +687,6 @@ void SSAFEM::cache_residual_cfbc() {
  */
 void SSAFEM::compute_local_function(Vector2 const *const *const velocity_global,
                                     Vector2 **residual_global) {
-
-  const bool use_explicit_driving_stress = (m_driving_stress_x != NULL) && (m_driving_stress_y != NULL);
 
   const bool use_cfbc = m_config->get_boolean("stress_balance.calving_front_stress_bc");
 
@@ -774,7 +767,7 @@ void SSAFEM::compute_local_function(Vector2 const *const *const velocity_global,
 
           quad_point_values(Q, coeffs, mask, thickness, tauc, hardness);
 
-          if (use_explicit_driving_stress) {
+          if (m_use_explicit_driving_stress) {
             explicit_driving_stress(Q, coeffs, tau_d);
           } else {
             driving_stress(Q, coeffs, tau_d);

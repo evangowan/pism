@@ -53,13 +53,6 @@ public:
   //! \brief Initialize the StressBalance object.
   void init();
 
-  //! \brief Set the vertically-averaged ice velocity boundary condition.
-  /*!
-   * Does not affect the SIA computation.
-   */
-  void set_boundary_conditions(const IceModelVec2Int &locations,
-                               const IceModelVec2V &velocities);
-
   void set_basal_melt_rate(const IceModelVec2S &bmr);
 
   //! \brief Update all the fields if (not fast), only update diffusive flux

@@ -232,46 +232,43 @@ protected:
   ocean::OceanModel     *m_ocean;
   bed::BedDef           *m_beddef;
 
-  // state variables and some diagnostics/internals
+  //! Longitude; ghosted to compute cell areas
+  IceModelVec2S m_longitude;
+  //! Latitude; ghosted to compute cell areas
+  IceModelVec2S m_latitude;
+  //! cell areas (computed using the WGS84 datum)
+  IceModelVec2S m_cell_area;
 
   //! ice surface elevation; ghosted
   IceModelVec2S m_ice_surface_elevation;
   //! ghosted
   IceModelVec2S m_ice_thickness;
+  //! cell type mask
+  IceModelVec2CellType m_cell_type;
+  //! accumulated mass advected to a partially filled grid cell
+  IceModelVec2S m_Href;
+  //! mask to determine grounding line position
+  IceModelVec2S m_gl_mask;
+
   //! ghosted
   IceModelVec2S m_basal_yield_stress;
   //! rate of production of basal meltwater (ice-equivalent); no ghosts
   IceModelVec2S m_basal_melt_rate;
-  //! Longitude; ghosted to compute cell areas
-  IceModelVec2S m_longitude;
-  //! Latitude; ghosted to compute cell areas
-  IceModelVec2S m_latitude;
-  //! accumulated mass advected to a partially filled grid cell
-  IceModelVec2S m_Href;
-  //! cell areas (computed using the WGS84 datum)
-  IceModelVec2S m_cell_area;
   //! flux divergence
   IceModelVec2S m_flux_divergence;
 
   FractureFields *m_fracture;
+  //! major and minor principal components of horizontal strain-rate tensor
+  IceModelVec2 m_strain_rates;  // temporary
+  //! components of horizontal stress tensor along axes and shear stress
+  IceModelVec2 m_deviatoric_stresses; // temporary
 
 protected:
-
-  IceModelVec2 m_strain_rates; //!< major and minor principal components of horizontal strain-rate tensor
-  
-  IceModelVec2 m_deviatoric_stresses; //!< components of horizontal stress tensor along axes and shear stress
-
-  //! \brief mask for flow type with values ice_free_bedrock, grounded_ice, floating_ice,
-  //! ice_free_ocean
-  IceModelVec2CellType m_cell_type;
 
   //! mask to determine Dirichlet boundary locations
   IceModelVec2Int m_ssa_dirichlet_bc_mask;
   //! Dirichlet boundary velocities
   IceModelVec2V m_ssa_dirichlet_bc_values;
-  
-  //! mask to determine grounding line position
-  IceModelVec2S m_gl_mask;
 
   // parameters
   //! mass continuity time step, s
@@ -488,8 +485,8 @@ protected:
   virtual void init_viewers();
   virtual void update_viewers();
   virtual void view_field(const IceModelVec *field);
-  std::set<std::string> m_map_viewers, m_slice_viewers;
-  std::map<std::string,petsc::Viewer::Ptr> viewers;
+  std::set<std::string> m_map_viewers;
+  std::map<std::string,petsc::Viewer::Ptr> m_viewers;
 
 private:
   double m_start_time;    // this is used in the wall-clock-time backup code
