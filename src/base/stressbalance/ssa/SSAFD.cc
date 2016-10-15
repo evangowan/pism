@@ -251,7 +251,7 @@ void SSAFD::init_impl() {
   }
 }
 
-void SSAFD::update(bool fast, const ShallowStressBalanceInputs &inputs) {
+void SSAFD::update(bool fast, const StressBalanceInputs &inputs) {
   m_melange_back_pressure = inputs.melange_back_pressure;
 
   // The FD solver does not support direct specification of a driving stress;
@@ -280,7 +280,7 @@ In the case of Dirichlet boundary conditions, the entries on the right-hand side
 come from known velocity values.  The fields m_bc_values and m_bc_mask are used for
 this.
  */
-void SSAFD::assemble_rhs(const ShallowStressBalanceInputs &inputs) {
+void SSAFD::assemble_rhs(const StressBalanceInputs &inputs) {
   const double dx = m_grid->dx(), dy = m_grid->dy();
 
   const double ice_free_default_velocity = 0.0;
@@ -478,7 +478,7 @@ the second equation we also have 13 nonzeros per row.
 FIXME:  document use of DAGetMatrix and MatStencil and MatSetValuesStencil
 
 */
-void SSAFD::assemble_matrix(const ShallowStressBalanceInputs &inputs, bool include_basal_shear, Mat A) {
+void SSAFD::assemble_matrix(const StressBalanceInputs &inputs, bool include_basal_shear, Mat A) {
   PetscErrorCode  ierr;
 
   const double   dx=m_grid->dx(), dy=m_grid->dy();
@@ -861,7 +861,7 @@ but it may be worthwhile.  Note the user can already do `-pc_type asm
 
 FIXME: update this doxygen comment
 */
-void SSAFD::solve(const ShallowStressBalanceInputs &inputs) {
+void SSAFD::solve(const StressBalanceInputs &inputs) {
 
   // Store away old SSA velocity (it might be needed in case a solver
   // fails).
@@ -918,7 +918,7 @@ void SSAFD::solve(const ShallowStressBalanceInputs &inputs) {
   }
 }
 
-void SSAFD::picard_iteration(const ShallowStressBalanceInputs &inputs,
+void SSAFD::picard_iteration(const StressBalanceInputs &inputs,
                              double nuH_regularization,
                              double nuH_iter_failure_underrelax) {
 
@@ -956,7 +956,7 @@ void SSAFD::picard_iteration(const ShallowStressBalanceInputs &inputs,
 }
 
 //! \brief Manages the Picard iteration loop.
-void SSAFD::picard_manager(const ShallowStressBalanceInputs &inputs,
+void SSAFD::picard_manager(const StressBalanceInputs &inputs,
                            double nuH_regularization,
                            double nuH_iter_failure_underrelax) {
   PetscErrorCode ierr;
@@ -1117,7 +1117,7 @@ void SSAFD::picard_manager(const ShallowStressBalanceInputs &inputs,
 }
 
 //! Old SSAFD recovery strategy: increase the SSA regularization parameter.
-void SSAFD::picard_strategy_regularization(const ShallowStressBalanceInputs &inputs) {
+void SSAFD::picard_strategy_regularization(const StressBalanceInputs &inputs) {
   // this has no units; epsilon goes up by this ratio when previous value failed
   const double DEFAULT_EPSILON_MULTIPLIER_SSA = 4.0;
   double nuH_regularization = m_config->get_double("stress_balance.ssa.epsilon");
@@ -1187,7 +1187,7 @@ void SSAFD::compute_nuH_norm(double &norm, double &norm_change) {
 }
 
 //! \brief Computes vertically-averaged ice hardness on the staggered grid.
-void SSAFD::compute_hardav_staggered(const ShallowStressBalanceInputs &inputs) {
+void SSAFD::compute_hardav_staggered(const StressBalanceInputs &inputs) {
   const double *E_ij, *E_offset;
 
   std::vector<double> E(m_grid->Mz());
@@ -1353,7 +1353,7 @@ In this implementation we set \f$\nu H\f$ to a constant anywhere the ice is
 thinner than a certain minimum. See SSAStrengthExtension and compare how this
 issue is handled when -cfbc is set.
 */
-void SSAFD::compute_nuH_staggered(const ShallowStressBalanceInputs &inputs,
+void SSAFD::compute_nuH_staggered(const StressBalanceInputs &inputs,
                                   IceModelVec2Stag &result,
                                   double nuH_regularization) {
 
@@ -1437,7 +1437,7 @@ void SSAFD::compute_nuH_staggered(const ShallowStressBalanceInputs &inputs,
  *
  * @return 0 on success
  */
-void SSAFD::compute_nuH_staggered_cfbc(const ShallowStressBalanceInputs &inputs,
+void SSAFD::compute_nuH_staggered_cfbc(const StressBalanceInputs &inputs,
                                        IceModelVec2Stag &result,
                                        double nuH_regularization) {
   IceModelVec2V &uv = m_velocity; // shortcut

@@ -152,7 +152,7 @@ void SSAFEM::init_impl() {
   m_velocity_global.copy_from(m_velocity);
 
   // Store coefficient data at the element nodes.
-  ShallowStressBalanceInputs inputs;
+  StressBalanceInputs inputs;
   // FIXME: this will segfault
   cache_inputs(inputs);
 }
@@ -171,7 +171,7 @@ void SSAFEM::init_impl() {
  difference is that SSAFEM::solve() recomputes the cached values of the coefficients before calling
  SSAFEM::solve_nocache().
  */
-void SSAFEM::solve(const ShallowStressBalanceInputs &inputs) {
+void SSAFEM::solve(const StressBalanceInputs &inputs) {
 
   TerminationReason::Ptr reason = solve_with_reason(inputs);
   if (reason->failed()) {
@@ -182,7 +182,7 @@ void SSAFEM::solve(const ShallowStressBalanceInputs &inputs) {
   }
 }
 
-TerminationReason::Ptr SSAFEM::solve_with_reason(const ShallowStressBalanceInputs &inputs) {
+TerminationReason::Ptr SSAFEM::solve_with_reason(const StressBalanceInputs &inputs) {
 
   // Set up the system to solve.
   cache_inputs(inputs);
@@ -266,7 +266,7 @@ TerminationReason::Ptr SSAFEM::solve_nocache() {
    In addition to coefficients at element nodes we store "node types" used to identify interior
    elements, exterior elements, and boundary faces.
 */
-void SSAFEM::cache_inputs(const ShallowStressBalanceInputs &inputs) {
+void SSAFEM::cache_inputs(const StressBalanceInputs &inputs) {
   const std::vector<double> &z = m_grid->z();
 
   m_use_explicit_driving_stress = ((inputs.driving_stress_x != NULL) &&
@@ -545,7 +545,7 @@ void SSAFEM::PointwiseNuHAndBeta(double thickness,
    This method computes FIXME.
 
  */
-void SSAFEM::cache_residual_cfbc(const ShallowStressBalanceInputs &inputs) {
+void SSAFEM::cache_residual_cfbc(const StressBalanceInputs &inputs) {
 
   fem::BoundaryQuadrature2 bq(m_grid->dx(), m_grid->dy(), 1.0);
 

@@ -170,7 +170,7 @@ void SSA::init_impl() {
 }
 
 //! \brief Update the SSA solution.
-void SSA::update(bool fast, const ShallowStressBalanceInputs &inputs) {
+void SSA::update(bool fast, const StressBalanceInputs &inputs) {
 
   // update the cell type mask using the ice-free thickness threshold for stress balance
   // computations
@@ -202,7 +202,7 @@ surface gradient. When the thickness at a grid point is very small (below \c
 minThickEtaTransform in the procedure), the formula is slightly modified to
 give a lower driving stress. The transformation is not used in floating ice.
  */
-void SSA::compute_driving_stress(const ShallowStressBalanceInputs &inputs, IceModelVec2V &result) const {
+void SSA::compute_driving_stress(const StressBalanceInputs &inputs, IceModelVec2V &result) const {
   // shortcuts to improve readability (below)
   const IceModelVec2S &thk     = *inputs.ice_thickness;
   const IceModelVec2S &bed     = *inputs.bed_elevation;
@@ -403,7 +403,7 @@ IceModelVec::Ptr SSA_taud::compute_impl() {
   result->metadata(0) = m_vars[0];
   result->metadata(1) = m_vars[1];
 
-  ShallowStressBalanceInputs inputs;
+  StressBalanceInputs inputs;
   // FIXME: this will segfault
   model->compute_driving_stress(inputs, *result);
 

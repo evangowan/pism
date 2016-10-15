@@ -22,6 +22,7 @@
 #include "base/util/PISMComponent.hh"
 #include "base/util/iceModelVec.hh"
 #include "base/enthalpyConverter.hh"
+#include "PISMStressBalance.hh"
 
 namespace pism {
 namespace rheology {
@@ -33,26 +34,6 @@ class IceBasalResistancePlasticLaw;
 class IceModelVec2CellType;
 
 namespace stressbalance {
-
-class ShallowStressBalanceInputs {
-public:
-  ShallowStressBalanceInputs();
-  double sea_level;
-
-  const IceModelVec2S *melange_back_pressure;
-  const IceModelVec2S *ice_thickness;
-  const IceModelVec2S *bed_elevation;
-  const IceModelVec2S *surface_elevation;
-  const IceModelVec2S *grounded_cell_fraction;
-  const IceModelVec3  *ice_enthalpy;
-  const IceModelVec2S *basal_yield_stress;
-
-  // Support for direct specification of driving stress to the FEM SSA solver. This helps
-  // with certain test cases where the grid is periodic but the driving stress cannot be the
-  // gradient of a periodic function. (See commit ffb4be16.)
-  const IceModelVec2S *driving_stress_x;
-  const IceModelVec2S *driving_stress_y;
-};
 
 //! Shallow stress balance (such as the SSA).
 class ShallowStressBalance : public Component {
@@ -66,7 +47,7 @@ public:
   void set_boundary_conditions(const IceModelVec2Int &locations,
                                const IceModelVec2V &velocities);
 
-  virtual void update(bool fast, const ShallowStressBalanceInputs &inputs) = 0;
+  virtual void update(bool fast, const StressBalanceInputs &inputs) = 0;
 
   //! \brief Get the thickness-advective 2D velocity.
   const IceModelVec2V& velocity() const;
@@ -120,7 +101,7 @@ public:
   ZeroSliding(IceGrid::ConstPtr g);
   virtual ~ZeroSliding();
   
-  virtual void update(bool fast, const ShallowStressBalanceInputs &inputs);
+  virtual void update(bool fast, const StressBalanceInputs &inputs);
 
 protected:
 };
@@ -129,7 +110,7 @@ class PrescribedSliding : public ZeroSliding {
 public:
   PrescribedSliding(IceGrid::ConstPtr g);
   virtual ~PrescribedSliding();
-  virtual void update(bool fast, const ShallowStressBalanceInputs &inputs);
+  virtual void update(bool fast, const StressBalanceInputs &inputs);
   virtual void init();
 };
 

@@ -112,13 +112,13 @@ public:
 
   SSAStrengthExtension *strength_extension;
 
-  virtual void update(bool fast, const ShallowStressBalanceInputs &inputs);
+  virtual void update(bool fast, const StressBalanceInputs &inputs);
 
   void set_initial_guess(const IceModelVec2V &guess);
 
   virtual std::string stdout_report() const;
 
-  virtual void compute_driving_stress(const ShallowStressBalanceInputs &inputs, IceModelVec2V &result) const;
+  virtual void compute_driving_stress(const StressBalanceInputs &inputs, IceModelVec2V &result) const;
 
 protected:
   virtual void define_model_state_impl(const PIO &output) const;
@@ -129,7 +129,7 @@ protected:
   virtual void get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
                                     std::map<std::string, TSDiagnostic::Ptr> &ts_dict) const;
 
-  virtual void solve(const ShallowStressBalanceInputs &inputs) = 0;
+  virtual void solve(const StressBalanceInputs &inputs) = 0;
 
   double ocean_pressure_difference(bool shelf, bool dry_mode, double H, double bed, double sea_level,
                                    double rho_ice, double rho_ocean, double g);

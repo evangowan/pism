@@ -33,6 +33,20 @@
 namespace pism {
 namespace stressbalance {
 
+StressBalanceInputs::StressBalanceInputs() {
+  sea_level              = 0.0;
+  melange_back_pressure  = NULL;
+  ice_thickness          = NULL;
+  bed_elevation          = NULL;
+  surface_elevation      = NULL;
+  grounded_cell_fraction = NULL;
+  driving_stress_x       = NULL;
+  driving_stress_y       = NULL;
+  ice_enthalpy           = NULL;
+  basal_yield_stress     = NULL;
+  basal_melt_rate        = NULL;
+}
+
 StressBalance::StressBalance(IceGrid::ConstPtr g,
                              ShallowStressBalance *sb,
                              SSB_Modifier *ssb_mod)
@@ -80,7 +94,7 @@ void StressBalance::update(bool fast, double sea_level,
 
   try {
     profiling.begin("SSB");
-    ShallowStressBalanceInputs inputs;
+    StressBalanceInputs inputs;
     inputs.sea_level = sea_level;
     inputs.melange_back_pressure = &melange_back_pressure;
     m_shallow_stress_balance->update(fast, inputs);

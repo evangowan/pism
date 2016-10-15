@@ -45,7 +45,7 @@ public:
 
 protected:
   virtual void init_impl();
-  void cache_inputs(const ShallowStressBalanceInputs &inputs);
+  void cache_inputs(const StressBalanceInputs &inputs);
 
   //! Storage for SSA coefficients at element nodes.
   //!
@@ -102,9 +102,9 @@ protected:
 
   void compute_local_jacobian(Vector2 const *const *const velocity, Mat J);
 
-  virtual void solve(const ShallowStressBalanceInputs &inputs);
+  virtual void solve(const StressBalanceInputs &inputs);
 
-  TerminationReason::Ptr solve_with_reason(const ShallowStressBalanceInputs &inputs);
+  TerminationReason::Ptr solve_with_reason(const StressBalanceInputs &inputs);
 
   TerminationReason::Ptr solve_nocache();
 
@@ -140,7 +140,7 @@ protected:
   fem::Q1Quadrature4 m_quadrature;
 
 private:
-  void cache_residual_cfbc(const ShallowStressBalanceInputs &inputs);
+  void cache_residual_cfbc(const StressBalanceInputs &inputs);
   void monitor_jacobian(Mat Jac);
   void monitor_function(Vector2 const *const *const velocity_global,
                         Vector2 const *const *const residual_global);

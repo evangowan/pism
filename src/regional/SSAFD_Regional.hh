@@ -33,7 +33,7 @@ public:
   SSAFD_Regional(IceGrid::ConstPtr g);
   virtual ~SSAFD_Regional();
   virtual void init();
-  virtual void compute_driving_stress(const ShallowStressBalanceInputs &inputs, IceModelVec2V &taud) const;
+  virtual void compute_driving_stress(const StressBalanceInputs &inputs, IceModelVec2V &taud) const;
 };
 
 } // end of namespace stressbalance

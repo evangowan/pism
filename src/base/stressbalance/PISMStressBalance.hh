@@ -30,6 +30,28 @@ class IceModelVec2CellType;
 //! Stress balance models and related diagnostics.
 namespace stressbalance {
 
+class StressBalanceInputs {
+public:
+  StressBalanceInputs();
+  double sea_level;
+
+  const IceModelVec2S *melange_back_pressure;
+  const IceModelVec2S *ice_thickness;
+  const IceModelVec2S *bed_elevation;
+  const IceModelVec2S *surface_elevation;
+  const IceModelVec2S *grounded_cell_fraction;
+  const IceModelVec3  *ice_enthalpy;
+  const IceModelVec2S *basal_yield_stress;
+  const IceModelVec2S *basal_melt_rate;
+
+  // Support for direct specification of driving stress to the FEM SSA solver. This helps
+  // with certain test cases where the grid is periodic but the driving stress cannot be the
+  // gradient of a periodic function. (See commit ffb4be16.)
+  const IceModelVec2S *driving_stress_x;
+  const IceModelVec2S *driving_stress_y;
+};
+
+
 class ShallowStressBalance;
 class SSB_Modifier;
 

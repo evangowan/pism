@@ -44,7 +44,7 @@ void SSAFD_Regional::init() {
   }
 }
 
-void SSAFD_Regional::compute_driving_stress(const ShallowStressBalanceInputs &inputs,
+void SSAFD_Regional::compute_driving_stress(const StressBalanceInputs &inputs,
                                             IceModelVec2V &result) const {
 
   SSAFD::compute_driving_stress(inputs, result);

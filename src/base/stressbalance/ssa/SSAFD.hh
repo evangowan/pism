@@ -36,7 +36,7 @@ public:
   SSAFD(IceGrid::ConstPtr g);
   virtual ~SSAFD();
 
-  virtual void update(bool fast, const ShallowStressBalanceInputs &inputs);
+  virtual void update(bool fast, const StressBalanceInputs &inputs);
 
   const IceModelVec2Stag & integrated_viscosity() const;
 protected:
@@ -49,34 +49,34 @@ protected:
 
   virtual void pc_setup_asm();
   
-  virtual void solve(const ShallowStressBalanceInputs &inputs);
+  virtual void solve(const StressBalanceInputs &inputs);
 
-  virtual void picard_iteration(const ShallowStressBalanceInputs &inputs,
+  virtual void picard_iteration(const StressBalanceInputs &inputs,
                                 double nuH_regularization,
                                 double nuH_iter_failure_underrelax);
 
-  virtual void picard_manager(const ShallowStressBalanceInputs &inputs,
+  virtual void picard_manager(const StressBalanceInputs &inputs,
                               double nuH_regularization,
                               double nuH_iter_failure_underrelax);
 
-  virtual void picard_strategy_regularization(const ShallowStressBalanceInputs &inputs);
+  virtual void picard_strategy_regularization(const StressBalanceInputs &inputs);
 
-  virtual void compute_hardav_staggered(const ShallowStressBalanceInputs &inputs);
+  virtual void compute_hardav_staggered(const StressBalanceInputs &inputs);
 
-  virtual void compute_nuH_staggered(const ShallowStressBalanceInputs &inputs,
+  virtual void compute_nuH_staggered(const StressBalanceInputs &inputs,
                                      IceModelVec2Stag &result,
                                      double epsilon);
 
-  virtual void compute_nuH_staggered_cfbc(const ShallowStressBalanceInputs &inputs,
+  virtual void compute_nuH_staggered_cfbc(const StressBalanceInputs &inputs,
                                           IceModelVec2Stag &result,
                                           double nuH_regularization);
 
   virtual void compute_nuH_norm(double &norm,
                                 double &norm_change);
 
-  virtual void assemble_matrix(const ShallowStressBalanceInputs &inputs, bool include_basal_shear, Mat A);
+  virtual void assemble_matrix(const StressBalanceInputs &inputs, bool include_basal_shear, Mat A);
 
-  virtual void assemble_rhs(const ShallowStressBalanceInputs &inputs);
+  virtual void assemble_rhs(const StressBalanceInputs &inputs);
 
   virtual void write_system_petsc(const std::string &namepart);
 
