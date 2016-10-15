@@ -277,7 +277,7 @@ void SSAFEM::cache_inputs(const ShallowStressBalanceInputs &inputs) {
   list.add(*inputs.ice_enthalpy);
   list.add(*inputs.ice_thickness);
   list.add(*inputs.bed_elevation);
-  list.add(*m_tauc);
+  list.add(*inputs.basal_yield_stress);
 
   if (m_use_explicit_driving_stress) {
     list.add(*inputs.driving_stress_x);
@@ -309,7 +309,7 @@ void SSAFEM::cache_inputs(const ShallowStressBalanceInputs &inputs) {
       c.thickness      = thickness;
       c.bed            = (*inputs.bed_elevation)(i, j);
       c.sea_level      = m_sea_level; // FIXME: use a 2D field
-      c.tauc           = (*m_tauc)(i, j);
+      c.tauc           = (*inputs.basal_yield_stress)(i, j);
       c.hardness       = hardness;
       c.driving_stress = tau_d;
 

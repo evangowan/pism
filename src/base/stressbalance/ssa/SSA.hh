@@ -135,7 +135,6 @@ protected:
                                    double rho_ice, double rho_ocean, double g);
 
   IceModelVec2CellType m_mask;
-  const IceModelVec2S *m_tauc;
   IceModelVec2V m_taud;
 
   std::string m_stdout_ssa;

@@ -73,8 +73,6 @@ double SSAStrengthExtension::get_min_thickness() const {
 SSA::SSA(IceGrid::ConstPtr g)
   : ShallowStressBalance(g)
 {
-  m_tauc = NULL;
-
   strength_extension = new SSAStrengthExtension(*m_config);
 
   const unsigned int WIDE_STENCIL = m_config->get_double("grid.max_stencil_width");
@@ -140,8 +138,6 @@ void SSA::init_impl() {
   m_log->message(2,
              "  [using the %s flow law]\n", m_flow_law->name().c_str());
 
-  m_tauc      = m_grid->variables().get_2d_scalar("tauc");
-
   InputOptions opts = process_input_options(m_grid->com);
 
   // Check if PISM is being initialized from an output file from a previous run
@@ -188,7 +184,7 @@ void SSA::update(bool fast, const ShallowStressBalanceInputs &inputs) {
 
   if (not fast) {
     solve(inputs);
-    compute_basal_frictional_heating(m_velocity, *m_tauc, m_mask,
+    compute_basal_frictional_heating(m_velocity, *inputs.basal_yield_stress, m_mask,
                                      m_basal_frictional_heating);
   }
 }

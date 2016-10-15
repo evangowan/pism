@@ -499,7 +499,7 @@ void SSAFD::assemble_matrix(const ShallowStressBalanceInputs &inputs, bool inclu
 
   IceModelVec::AccessList list;
   list.add(m_nuH);
-  list.add(*m_tauc);
+  list.add(*inputs.basal_yield_stress);
   list.add(vel);
   list.add(m_mask);
 
@@ -732,7 +732,7 @@ void SSAFD::assemble_matrix(const ShallowStressBalanceInputs &inputs, bool inclu
       double beta = 0.0;
       if (include_basal_shear) {
         if (grounded_ice(M_ij)) {
-          beta = m_basal_sliding_law->drag((*m_tauc)(i,j), vel(i,j).u, vel(i,j).v);
+          beta = m_basal_sliding_law->drag((*inputs.basal_yield_stress)(i,j), vel(i,j).u, vel(i,j).v);
         } else if (ice_free_land(M_ij)) {
           // apply drag even in this case, to help with margins; note ice free
           // areas already have a strength extension
@@ -741,7 +741,7 @@ void SSAFD::assemble_matrix(const ShallowStressBalanceInputs &inputs, bool inclu
         if (sub_gl) {
           // reduce the basal drag at grid cells that are partially grounded:
           if (icy(M_ij)) {
-            beta = (*inputs.grounded_cell_fraction)(i,j) * m_basal_sliding_law->drag((*m_tauc)(i,j), vel(i,j).u, vel(i,j).v);
+            beta = (*inputs.grounded_cell_fraction)(i,j) * m_basal_sliding_law->drag((*inputs.basal_yield_stress)(i,j), vel(i,j).u, vel(i,j).v);
           }
         }
       }

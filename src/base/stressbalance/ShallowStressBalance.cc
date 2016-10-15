@@ -43,6 +43,7 @@ ShallowStressBalanceInputs::ShallowStressBalanceInputs() {
   driving_stress_x       = NULL;
   driving_stress_y       = NULL;
   ice_enthalpy           = NULL;
+  basal_yield_stress     = NULL;
 }
 
 using pism::mask::ice_free;

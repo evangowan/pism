@@ -93,25 +93,6 @@ void IP_SSATaucForwardProblem::construct() {
   PISM_CHK(ierr, "KSPSetFromOptions");
 }
 
-void IP_SSATaucForwardProblem::init() {
-
-  // This calls SSA::init(), which calls pism::Vars::get_2d_scalar()
-  // to set m_tauc.
-  SSAFEM::init();
-
-  // The purpose of this change is to make the forward model (SSAFEM)
-  // see changes to tauc made in set_design() below.
-  //
-  // As far as I can tell in this context tauc does not come from a
-  // yield stress model, so this should do no harm.
-  //
-  // I don't know if this is necessary, though. Before this change
-  // set_design used to mess with values in the field pointed to by
-  // SSA::m_tauc *which we do not own*. (This is bad.)
-  // -- CK, January 7, 2015
-  m_tauc = &m_tauc_copy;
-}
-
 //! Sets the current value of of the design paramter \f$\zeta\f$.
 /*! This method sets \f$\zeta\f$ but does not solve the %SSA.
 It it intended for inverse methods that simultaneously compute

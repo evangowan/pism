@@ -39,15 +39,13 @@ public:
   ShallowStressBalanceInputs();
   double sea_level;
 
-  const IceModelVec2V *bc_values;
-  const IceModelVec2Int *bc_mask;
-
   const IceModelVec2S *melange_back_pressure;
   const IceModelVec2S *ice_thickness;
   const IceModelVec2S *bed_elevation;
   const IceModelVec2S *surface_elevation;
   const IceModelVec2S *grounded_cell_fraction;
   const IceModelVec3  *ice_enthalpy;
+  const IceModelVec2S *basal_yield_stress;
 
   // Support for direct specification of driving stress to the FEM SSA solver. This helps
   // with certain test cases where the grid is periodic but the driving stress cannot be the
