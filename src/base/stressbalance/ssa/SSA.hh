@@ -138,8 +138,6 @@ protected:
   const IceModelVec2S *m_tauc;
   IceModelVec2V m_taud;
 
-  const IceModelVec2S *m_gl_mask;
-
   std::string m_stdout_ssa;
 
   // objects used by the SSA solver (internally)

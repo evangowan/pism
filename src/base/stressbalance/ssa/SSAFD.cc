@@ -507,9 +507,9 @@ void SSAFD::assemble_matrix(const ShallowStressBalanceInputs &inputs, bool inclu
     list.add(*m_bc_mask);
   }
 
-  const bool sub_gl = m_config->get_boolean("geometry.grounded_cell_fraction");
+  const bool sub_gl = inputs.grounded_cell_fraction != NULL;
   if (sub_gl) {
-    list.add(*m_gl_mask);
+    list.add(*inputs.grounded_cell_fraction);
   }
 
   // handles friction of the ice cell along ice-free bedrock margins when bedrock higher than ice surface (in simplified setups)
@@ -741,7 +741,7 @@ void SSAFD::assemble_matrix(const ShallowStressBalanceInputs &inputs, bool inclu
         if (sub_gl) {
           // reduce the basal drag at grid cells that are partially grounded:
           if (icy(M_ij)) {
-            beta = (*m_gl_mask)(i,j) * m_basal_sliding_law->drag((*m_tauc)(i,j), vel(i,j).u, vel(i,j).v);
+            beta = (*inputs.grounded_cell_fraction)(i,j) * m_basal_sliding_law->drag((*m_tauc)(i,j), vel(i,j).u, vel(i,j).v);
           }
         }
       }

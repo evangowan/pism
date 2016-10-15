@@ -46,6 +46,7 @@ public:
   const IceModelVec2S *ice_thickness;
   const IceModelVec2S *bed_elevation;
   const IceModelVec2S *surface_elevation;
+  const IceModelVec2S *grounded_cell_fraction;
   const IceModelVec3  *ice_enthalpy;
 
   // Support for direct specification of driving stress to the FEM SSA solver. This helps

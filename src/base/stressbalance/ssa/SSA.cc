@@ -74,7 +74,6 @@ SSA::SSA(IceGrid::ConstPtr g)
   : ShallowStressBalance(g)
 {
   m_tauc = NULL;
-  m_gl_mask = NULL;
 
   strength_extension = new SSAStrengthExtension(*m_config);
 
@@ -140,10 +139,6 @@ void SSA::init_impl() {
   m_log->message(2, "* Initializing the SSA stress balance...\n");
   m_log->message(2,
              "  [using the %s flow law]\n", m_flow_law->name().c_str());
-
-  if (m_config->get_boolean("geometry.grounded_cell_fraction")) {
-    m_gl_mask = m_grid->variables().get_2d_scalar("gl_mask");
-  }
 
   m_tauc      = m_grid->variables().get_2d_scalar("tauc");
 

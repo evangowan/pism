@@ -34,14 +34,15 @@ namespace pism {
 namespace stressbalance {
 
 ShallowStressBalanceInputs::ShallowStressBalanceInputs() {
-  sea_level             = 0.0;
-  melange_back_pressure = NULL;
-  ice_thickness         = NULL;
-  bed_elevation         = NULL;
-  surface_elevation     = NULL;
-  driving_stress_x      = NULL;
-  driving_stress_y      = NULL;
-  ice_enthalpy          = NULL;
+  sea_level              = 0.0;
+  melange_back_pressure  = NULL;
+  ice_thickness          = NULL;
+  bed_elevation          = NULL;
+  surface_elevation      = NULL;
+  grounded_cell_fraction = NULL;
+  driving_stress_x       = NULL;
+  driving_stress_y       = NULL;
+  ice_enthalpy           = NULL;
 }
 
 using pism::mask::ice_free;
