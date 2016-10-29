@@ -535,10 +535,10 @@ void IceModel::step(bool do_mass_continuity,
   m_ocean->melange_back_pressure_fraction(melange_back_pressure);
 
   try {
+    stressbalance::StressBalanceInputs inputs;
+    // FIXME: this will segfault
     profiling.begin("stress balance");
-    m_stress_balance->update(not updateAtDepth,
-                             m_ocean->sea_level_elevation(),
-                             melange_back_pressure);
+    m_stress_balance->update(not updateAtDepth, inputs);
     profiling.end("stress balance");
   } catch (RuntimeError &e) {
     options::String output_file("-o", "output file name",

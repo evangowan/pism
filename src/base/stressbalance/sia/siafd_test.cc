@@ -408,7 +408,9 @@ int main(int argc, char *argv[]) {
 
     // Solve (fast==true means "no 3D update and no strain heating computation"):
     bool fast = false;
-    stress_balance.update(fast, 0.0, melange_back_pressure);
+    StressBalanceInputs inputs;
+    // FIXME: this will segfault
+    stress_balance.update(fast, inputs);
 
     // Report errors relative to the exact solution:
     const IceModelVec3

@@ -35,18 +35,28 @@ public:
   StressBalanceInputs();
   double sea_level;
 
-  const IceModelVec2S *melange_back_pressure;
-  const IceModelVec2S *ice_thickness;
-  const IceModelVec2S *bed_elevation;
-  const IceModelVec2S *surface_elevation;
-  const IceModelVec2S *grounded_cell_fraction;
-  const IceModelVec3  *ice_enthalpy;
-  const IceModelVec2S *basal_yield_stress;
+  // geometry
+  const IceModelVec2S        *ice_thickness;
+  const IceModelVec2S        *bed_elevation;
+  const IceModelVec2S        *surface_elevation;
+  const IceModelVec2CellType *cell_type;
+  const IceModelVec2S        *grounded_cell_fraction;
+
+  // energy
+  const IceModelVec3 *ice_enthalpy;
+
+  // velocity
   const IceModelVec2S *basal_melt_rate;
 
-  // Support for direct specification of driving stress to the FEM SSA solver. This helps
-  // with certain test cases where the grid is periodic but the driving stress cannot be the
-  // gradient of a periodic function. (See commit ffb4be16.)
+  // boundary conditions
+  const IceModelVec2S *melange_back_pressure;
+  const IceModelVec2S *basal_yield_stress;
+
+  const IceModelVec2S *fracture_density;
+
+  // Support for direct specification of driving stress to the FEM SSA solver. This helps with
+  // certain test cases where the grid is periodic but the driving stress cannot be the gradient of
+  // a periodic function. (See commit ffb4be16.)
   const IceModelVec2S *driving_stress_x;
   const IceModelVec2S *driving_stress_y;
 };
@@ -75,12 +85,9 @@ public:
   //! \brief Initialize the StressBalance object.
   void init();
 
-  void set_basal_melt_rate(const IceModelVec2S &bmr);
-
   //! \brief Update all the fields if (not fast), only update diffusive flux
   //! and max. diffusivity otherwise.
-  void update(bool fast, double sea_level,
-              const IceModelVec2S &melange_back_pressure);
+  void update(bool fast, const StressBalanceInputs &inputs);
 
   //! \brief Get the thickness-advective (SSA) 2D velocity.
   const IceModelVec2V& advective_velocity() const;
@@ -130,17 +137,21 @@ protected:
 
   virtual void compute_vertical_velocity(const IceModelVec3 &u,
                                          const IceModelVec3 &v,
+                                         const IceModelVec2CellType &mask,
                                          const IceModelVec2S *bmr,
                                          IceModelVec3 &result);
-  virtual void compute_volumetric_strain_heating();
+  virtual void compute_volumetric_strain_heating(const IceModelVec2S &thickness,
+                                                 const IceModelVec3 &enthalpy,
+                                                 const IceModelVec2CellType &mask);
 
-  CFLData compute_cfl_2d();
-  CFLData compute_cfl_3d();
+  CFLData compute_cfl_2d(const IceModelVec2S &ice_thickness,
+                         const IceModelVec2CellType &cell_type);
+  CFLData compute_cfl_3d(const IceModelVec2S &ice_thickness,
+                         const IceModelVec2CellType &cell_type);
 
   CFLData m_cfl_2d, m_cfl_3d;
 
   IceModelVec3 m_w, m_strain_heating;
-  const IceModelVec2S *m_basal_melt_rate;
 
   ShallowStressBalance *m_shallow_stress_balance;
   SSB_Modifier *m_modifier;

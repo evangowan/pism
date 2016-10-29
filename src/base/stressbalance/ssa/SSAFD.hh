@@ -94,7 +94,7 @@ protected:
 
   virtual bool is_marginal(int i, int j, bool ssa_dirichlet_bc);
 
-  virtual void fracture_induced_softening();
+  virtual void fracture_induced_softening(const IceModelVec2S &fracture_density);
 
   // objects used internally
   IceModelVec2Stag m_hardness, m_nuH, m_nuH_old;
@@ -104,7 +104,6 @@ protected:
   IceModelVec2V m_b;            // right hand side
   double m_scaling;
 
-  const IceModelVec2S *m_fracture_density, *m_melange_back_pressure;
   IceModelVec2V m_velocity_old;
 
   unsigned int m_default_pc_failure_count,

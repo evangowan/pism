@@ -45,14 +45,14 @@ StressBalanceInputs::StressBalanceInputs() {
   ice_enthalpy           = NULL;
   basal_yield_stress     = NULL;
   basal_melt_rate        = NULL;
+  fracture_density       = NULL;
+  cell_type              = NULL;
 }
 
 StressBalance::StressBalance(IceGrid::ConstPtr g,
                              ShallowStressBalance *sb,
                              SSB_Modifier *ssb_mod)
   : Component(g), m_shallow_stress_balance(sb), m_modifier(ssb_mod) {
-
-  m_basal_melt_rate = NULL;
 
   // allocate the vertical velocity field:
   m_w.create(m_grid, "wvel_rel", WITHOUT_GHOSTS);
@@ -80,23 +80,13 @@ void StressBalance::init() {
   m_modifier->init();
 }
 
-//! \brief Set the basal melt rate. (If not NULL, it will be included in the
-//! computation of the vertical valocity).
-void StressBalance::set_basal_melt_rate(const IceModelVec2S &bmr_input) {
-  m_basal_melt_rate = &bmr_input;
-}
-
 //! \brief Performs the shallow stress balance computation.
-void StressBalance::update(bool fast, double sea_level,
-                           const IceModelVec2S &melange_back_pressure) {
+void StressBalance::update(bool fast, const StressBalanceInputs &inputs) {
 
   const Profiling &profiling = m_grid->ctx()->profiling();
 
   try {
     profiling.begin("SSB");
-    StressBalanceInputs inputs;
-    inputs.sea_level = sea_level;
-    inputs.melange_back_pressure = &melange_back_pressure;
     m_shallow_stress_balance->update(fast, inputs);
     profiling.end("SSB");
 
@@ -111,17 +101,21 @@ void StressBalance::update(bool fast, double sea_level,
       const IceModelVec3 &v = m_modifier->velocity_v();
 
       profiling.begin("SB strain heat");
-      this->compute_volumetric_strain_heating();
+      this->compute_volumetric_strain_heating(*inputs.ice_thickness,
+                                              *inputs.ice_enthalpy,
+                                              *inputs.cell_type);
       profiling.end("SB strain heat");
 
       profiling.begin("SB vert. vel.");
-      this->compute_vertical_velocity(u, v, m_basal_melt_rate, m_w);
+      this->compute_vertical_velocity(u, v, *inputs.cell_type,
+                                      inputs.basal_melt_rate,
+                                      m_w);
       profiling.end("SB vert. vel.");
 
-      m_cfl_3d = compute_cfl_3d();
+      m_cfl_3d = compute_cfl_3d(*inputs.ice_thickness, *inputs.cell_type);
     }
 
-    m_cfl_2d = compute_cfl_2d();
+    m_cfl_2d = compute_cfl_2d(*inputs.ice_thickness, *inputs.cell_type);
   }
   catch (RuntimeError &e) {
     e.add_context("updating the stress balance");
@@ -129,18 +123,16 @@ void StressBalance::update(bool fast, double sea_level,
   }
 }
 
-CFLData StressBalance::compute_cfl_2d() {
-  const IceModelVec2S &ice_thickness = *m_grid->variables().get_2d_scalar("land_ice_thickness");
-  const IceModelVec2CellType &cell_type = *m_grid->variables().get_2d_cell_type("mask");
+CFLData StressBalance::compute_cfl_2d(const IceModelVec2S &ice_thickness,
+                                      const IceModelVec2CellType &cell_type) {
 
   return ::pism::max_timestep_cfl_2d(ice_thickness,
                                      cell_type,
                                      m_shallow_stress_balance->velocity());
 }
 
-CFLData StressBalance::compute_cfl_3d() {
-  const IceModelVec2S &ice_thickness = *m_grid->variables().get_2d_scalar("land_ice_thickness");
-  const IceModelVec2CellType &cell_type = *m_grid->variables().get_2d_cell_type("mask");
+CFLData StressBalance::compute_cfl_3d(const IceModelVec2S &ice_thickness,
+                                      const IceModelVec2CellType &cell_type) {
 
   return ::pism::max_timestep_cfl_3d(ice_thickness,
                                      cell_type,
@@ -227,10 +219,9 @@ The vertical integral is computed by the trapezoid rule.
  */
 void StressBalance::compute_vertical_velocity(const IceModelVec3 &u,
                                               const IceModelVec3 &v,
+                                              const IceModelVec2CellType &mask,
                                               const IceModelVec2S *basal_melt_rate,
                                               IceModelVec3 &result) {
-
-  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
 
   const bool use_upstream_fd = m_config->get_string("stress_balance.vertical_velocity_approximation") == "upstream";
 
@@ -454,7 +445,9 @@ static inline double D2(double u_x, double u_y, double u_z, double v_x, double v
 
   @return 0 on success
  */
-void StressBalance::compute_volumetric_strain_heating() {
+void StressBalance::compute_volumetric_strain_heating(const IceModelVec2S &thickness,
+                                                      const IceModelVec3 &enthalpy,
+                                                      const IceModelVec2CellType &mask) {
   PetscErrorCode ierr;
 
   const rheology::FlowLaw *flow_law = m_shallow_stress_balance->flow_law();
@@ -464,11 +457,6 @@ void StressBalance::compute_volumetric_strain_heating() {
     &u = m_modifier->velocity_u(),
     &v = m_modifier->velocity_v();
 
-  const IceModelVec2S *thickness = m_grid->variables().get_2d_scalar("land_ice_thickness");
-  const IceModelVec3  *enthalpy  = m_grid->variables().get_3d_scalar("enthalpy");
-
-  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
-
   double
     enhancement_factor = flow_law->enhancement_factor(),
     n = flow_law->exponent(),
@@ -477,9 +465,9 @@ void StressBalance::compute_volumetric_strain_heating() {
 
   IceModelVec::AccessList list;
   list.add(mask);
-  list.add(*enthalpy);
+  list.add(enthalpy);
   list.add(m_strain_heating);
-  list.add(*thickness);
+  list.add(thickness);
   list.add(u);
   list.add(v);
 
@@ -492,7 +480,7 @@ void StressBalance::compute_volumetric_strain_heating() {
     for (Points p(*m_grid); p; p.next()) {
       const int i = p.i(), j = p.j();
 
-      double H = (*thickness)(i,j);
+      double H = thickness(i,j);
       int ks = m_grid->kBelowHeight(H);
       const double
         *u_ij, *u_w, *u_n, *u_e, *u_s,
@@ -548,7 +536,7 @@ void StressBalance::compute_volumetric_strain_heating() {
       v_s  = v.get_column(i,     j - 1);
       v_n  = v.get_column(i,     j + 1);
 
-      E_ij = enthalpy->get_column(i, j);
+      E_ij = enthalpy.get_column(i, j);
       Sigma = m_strain_heating.get_column(i, j);
 
       for (int k = 0; k <= ks; ++k) {

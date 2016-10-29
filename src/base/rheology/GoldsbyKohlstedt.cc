@@ -90,7 +90,7 @@ double GoldsbyKohlstedt::hardness_impl(double enthalpy, double pressure) const {
 
   // We use the Paterson-Budd relation for the hardness parameter. It would be nice if we didn't
   // have to, but we currently need ice hardness to compute the strain heating. See
-  // SIAFD::compute_volumetric_strain_heating().
+  // StressBalance::compute_volumetric_strain_heating().
   double
     T_pa = m_EC->pressure_adjusted_temperature(enthalpy, pressure),
     A = softness_paterson_budd(T_pa);

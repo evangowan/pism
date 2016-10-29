@@ -99,9 +99,6 @@ SSAFD::SSAFD(IceGrid::ConstPtr g)
 
   m_dump_system_matlab = false;
 
-  m_fracture_density = NULL;
-  m_melange_back_pressure = NULL;
-
   // PETSc objects and settings
   {
     PetscErrorCode ierr;
@@ -245,14 +242,9 @@ void SSAFD::init_impl() {
 
   m_default_pc_failure_count     = 0;
   m_default_pc_failure_max_count = 5;
-
-  if (m_config->get_boolean("fracture_density.enabled")) {
-    m_fracture_density = m_grid->variables().get_2d_scalar("fracture_density");
-  }
 }
 
 void SSAFD::update(bool fast, const StressBalanceInputs &inputs) {
-  m_melange_back_pressure = inputs.melange_back_pressure;
 
   // The FD solver does not support direct specification of a driving stress;
   // a surface elevation must be explicitly given.
@@ -314,8 +306,8 @@ void SSAFD::assemble_rhs(const StressBalanceInputs &inputs) {
     list.add(m_mask);
   }
 
-  if (use_cfbc && m_melange_back_pressure != NULL) {
-    list.add(*m_melange_back_pressure);
+  if (use_cfbc && inputs.melange_back_pressure != NULL) {
+    list.add(*inputs.melange_back_pressure);
   }
 
   for (Points p(*m_grid); p; p.next()) {
@@ -373,8 +365,8 @@ void SSAFD::assemble_rhs(const StressBalanceInputs &inputs) {
                                                           H_ij, (*inputs.bed_elevation)(i,j), m_sea_level,
                                                           rho_ice, rho_ocean, standard_gravity);
 
-        if (m_melange_back_pressure != NULL) {
-          double lambda = (*m_melange_back_pressure)(i, j);
+        if (inputs.melange_back_pressure != NULL) {
+          double lambda = (*inputs.melange_back_pressure)(i, j);
 
           // adjust the "pressure imbalance term" using the provided
           // "melange back pressure fraction".
@@ -1231,15 +1223,15 @@ void SSAFD::compute_hardav_staggered(const StressBalanceInputs &inputs) {
                                                       H, m_grid->kBelowHeight(H),
                                                       &(m_grid->z()[0]), &E[0]);
       } // o
-    }
+    }   // loop over points
   } catch (...) {
     loop.failed();
   }
   loop.check();
-     // loop over points
 
-
-  fracture_induced_softening();
+  if (inputs.fracture_density != NULL) {
+    fracture_induced_softening(*inputs.fracture_density);
+  }
 }
 
 
@@ -1276,10 +1268,7 @@ void SSAFD::compute_hardav_staggered(const StressBalanceInputs &inputs) {
   So scaling the enhancement factor by \f$C\f$ is equivalent to scaling
   ice hardness \f$B\f$ by \f$C^{-\frac1n}\f$.
 */
-void SSAFD::fracture_induced_softening() {
-  if (not m_config->get_boolean("fracture_density.enabled")) {
-    return;
-  }
+void SSAFD::fracture_induced_softening(const IceModelVec2S &fracture_density) {
 
   const double
     epsilon = m_config->get_double("fracture_density.softening_lower_limit"),
@@ -1287,7 +1276,7 @@ void SSAFD::fracture_induced_softening() {
 
   IceModelVec::AccessList list;
   list.add(m_hardness);
-  list.add(*m_fracture_density);
+  list.add(fracture_density);
 
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
@@ -1297,7 +1286,7 @@ void SSAFD::fracture_induced_softening() {
 
       const double
         // fracture density on the staggered grid:
-        phi       = 0.5 * ((*m_fracture_density)(i,j) + (*m_fracture_density)(i+oi,j+oj)),
+        phi       = 0.5 * (fracture_density(i,j) + fracture_density(i+oi,j+oj)),
         // the line below implements equation (6) in the paper
         softening = pow((1.0-(1.0-epsilon)*phi), -n_glen);
 
