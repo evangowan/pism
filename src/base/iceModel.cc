@@ -536,6 +536,18 @@ void IceModel::step(bool do_mass_continuity,
 
   try {
     stressbalance::StressBalanceInputs inputs;
+    inputs.sea_level = m_ocean->sea_level_elevation();
+    inputs.ice_thickness = &m_ice_thickness;
+    inputs.bed_elevation = &m_beddef->bed_elevation();
+    inputs.surface_elevation = &m_ice_surface_elevation;
+    inputs.cell_type = &m_cell_type;
+    inputs.ice_enthalpy = &m_energy_model->enthalpy();
+    inputs.basal_melt_rate = &m_energy_model->basal_melt_rate();
+    inputs.basal_yield_stress = &m_basal_yield_stress;
+    if (m_config->get_boolean("geometry.grounded_cell_fraction")) {
+      inputs.grounded_cell_fraction = &m_gl_mask;
+    }
+
     // FIXME: this will segfault
     profiling.begin("stress balance");
     m_stress_balance->update(not updateAtDepth, inputs);
