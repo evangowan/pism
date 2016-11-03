@@ -241,8 +241,7 @@ if __name__ == '__main__':
         final_velocity.add(PISM.convert(sys, 1.0, "m/year", "m/second"),
                            u_noise)
 
-    pio = PISM.util.prepare_output(output_file_name)
-    pio.close()
+    PISM.util.prepare_output(output_file_name)
 
     vecs.write(output_file_name)
 

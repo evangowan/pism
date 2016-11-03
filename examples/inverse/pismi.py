@@ -48,8 +48,7 @@ class SSAForwardRun(PISM.invert.ssa.SSAForwardRunFromInputFile):
             grid = self.grid
             vecs = self.modeldata.vecs
 
-            pio = PISM.PIO(grid.com, "netcdf3")
-            pio.open(filename, PISM.PISM_READWRITE)  # append mode!
+            pio = PISM.PIO(grid.com, "netcdf3", filename, PISM.PISM_READWRITE) # append mode!
 
             self.modeldata.vecs.write(filename)
             pio.close()
@@ -459,8 +458,8 @@ def run():
 
     # Prep the output file from the grid so that we can save zeta to it during the runs.
     if not append_mode:
-        pio = PISM.util.prepare_output(output_filename)
-        pio.close()
+        PISM.util.prepare_output(output_filename)
+
     zeta.write(output_filename)
 
     # Log the command line to the output file now so that we have a record of

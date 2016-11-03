@@ -211,12 +211,10 @@ void AgeModel::init(const InputOptions &opts) {
 
   m_log->message(2, "* Initializing the age model...\n");
 
-  PIO input_file(m_grid->com, "guess_mode");
-
   double initial_age_years = m_config->get_double("age.initial_value", "years");
 
   if (opts.type == INIT_RESTART) {
-    input_file.open(opts.filename, PISM_READONLY);
+    PIO input_file(m_grid->com, "guess_mode", opts.filename, PISM_READONLY);
 
     if (input_file.inq_var("age")) {
       m_ice_age.read(input_file, opts.record);

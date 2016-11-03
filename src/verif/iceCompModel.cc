@@ -636,59 +636,130 @@ void IceCompModel::reportErrors() {
   m_log->message(1,
              "NUMERICAL ERRORS evaluated at final time (relative to exact solution):\n");
 
-  unsigned int start;
-  TimeseriesMetadata err("N", "N", m_sys);
+  double volexact, areaexact, domeHexact, volerr, areaerr, maxHerr, avHerr,
+    maxetaerr, centerHerr;
+  double maxTerr, avTerr, basemaxTerr, baseavTerr, basecenterTerr;
+  const double   m = (2.0 * flow_law->exponent() + 2.0) / flow_law->exponent();
+  double maxTberr, avTberr;
+  double max_strain_heating_error, av_strain_heating_error;
+  double maxUerr, avUerr, maxWerr, avWerr;
+  double maxbmelterr, minbmelterr;
 
-  err.set_string("units", "1");
+  // report errors
+  {
+    // geometry (thickness, vol) errors if appropriate; reported in m except for relmaxETA
+    if ((m_testname != 'K') && (m_testname != 'O')) {
+      computeGeometryErrors(volexact,areaexact,domeHexact,
+                            volerr,areaerr,maxHerr,avHerr,maxetaerr,centerHerr);
+      m_log->message(1,
+                     "geometry  :    prcntVOL        maxH         avH   relmaxETA\n");  // no longer reporting centerHerr
+      m_log->message(1, "           %12.6f%12.6f%12.6f%12.6f\n",
+                     100*volerr/volexact, maxHerr, avHerr,
+                     maxetaerr/pow(domeHexact,m));
+    }
 
-  PIO nc(m_grid->com, "netcdf3"); // OK to use netcdf3
+    // temperature errors for F and G
+    if ((m_testname == 'F') || (m_testname == 'G')) {
+      computeTemperatureErrors(maxTerr, avTerr);
+      computeBasalTemperatureErrors(basemaxTerr, baseavTerr, basecenterTerr);
+      m_log->message(1,
+                     "temp      :        maxT         avT    basemaxT     baseavT\n");  // no longer reporting   basecenterT
+      m_log->message(1, "           %12.6f%12.6f%12.6f%12.6f\n",
+                     maxTerr, avTerr, basemaxTerr, baseavTerr);
+
+    } else if ((m_testname == 'K') || (m_testname == 'O')) {
+      computeIceBedrockTemperatureErrors(maxTerr, avTerr, maxTberr, avTberr);
+      m_log->message(1,
+                     "temp      :        maxT         avT       maxTb        avTb\n");
+      m_log->message(1, "           %12.6f%12.6f%12.6f%12.6f\n",
+                     maxTerr, avTerr, maxTberr, avTberr);
+
+    }
+
+    // strain_heating errors if appropriate; reported in 10^6 J/(s m^3)
+    if ((m_testname == 'F') || (m_testname == 'G')) {
+      compute_strain_heating_errors(max_strain_heating_error, av_strain_heating_error);
+      m_log->message(1,
+                     "Sigma     :      maxSig       avSig\n");
+      m_log->message(1, "           %12.6f%12.6f\n",
+                     max_strain_heating_error*1.0e6, av_strain_heating_error*1.0e6);
+
+    }
+
+    // surface velocity errors if exact values are available; reported in m year-1
+    if ((m_testname == 'F') || (m_testname == 'G')) {
+      computeSurfaceVelocityErrors(maxUerr, avUerr, maxWerr, avWerr);
+      m_log->message(1,
+                     "surf vels :     maxUvec      avUvec        maxW         avW\n");
+      m_log->message(1,
+                     "           %12.6f%12.6f%12.6f%12.6f\n",
+                     convert(m_sys, maxUerr, "m second-1", "m year-1"),
+                     convert(m_sys, avUerr, "m second-1", "m year-1"),
+                     convert(m_sys, maxWerr, "m second-1", "m year-1"),
+                     convert(m_sys, avWerr, "m second-1", "m year-1"));
+
+    }
+
+    // basal melt rate errors if appropriate; reported in m year-1
+    if (m_testname == 'O') {
+      computeBasalMeltRateErrors(maxbmelterr, minbmelterr);
+      if (maxbmelterr != minbmelterr) {
+        m_log->message(1,
+                       "IceCompModel WARNING: unexpected Test O situation: max and min of bmelt error\n"
+                       "  are different: maxbmelterr = %f, minbmelterr = %f\n",
+                       convert(m_sys, maxbmelterr, "m second-1", "m year-1"),
+                       convert(m_sys, minbmelterr, "m second-1", "m year-1"));
+      }
+      m_log->message(1,
+                     "basal melt:  max\n");
+      m_log->message(1, "           %11.5f\n",
+                     convert(m_sys, maxbmelterr, "m second-1", "m year-1"));
+
+    }
+    m_log->message(1, "NUM ERRORS DONE\n");
+  } // end of error reporting
 
   options::String report_file("-report_file", "NetCDF error report file");
-  bool append = options::Bool("-append", "Append the NetCDF error report");
-
-  IO_Mode mode = append ? PISM_READWRITE : PISM_READWRITE_MOVE;
-
   if (report_file.is_set()) {
-    m_log->message(2, "Also writing errors to '%s'...\n", report_file->c_str());
+
+    TimeseriesMetadata err("N", "N", m_sys);
+    err.set_string("units", "1");
+
+    bool append = options::Bool("-append", "Append the NetCDF error report");
+    IO_Mode mode = append ? PISM_READWRITE : PISM_READWRITE_MOVE;
+
+    PIO nc(m_grid->com, "netcdf3", report_file, mode); // OK to use netcdf3
 
     // Find the number of records in this file:
-    nc.open(report_file, mode);
-    start = nc.inq_dimlen("N");
+    unsigned int start = nc.inq_dimlen("N");
 
-    io::write_global_attributes(nc, m_output_global_attributes);
+    // prepare an output file
+    {
+      m_log->message(2, "Also writing errors to '%s'...\n", report_file->c_str());
 
-    // Write the dimension variable:
-    io::write_timeseries(nc, err, (size_t)start, (double)(start + 1), PISM_INT);
+      io::write_global_attributes(nc, m_output_global_attributes);
 
-    // Always write grid parameters:
-    err.set_name("dx");
-    err.set_string("units", "meters");
-    io::write_timeseries(nc, err, (size_t)start, m_grid->dx());
-    err.set_name("dy");
-    io::write_timeseries(nc, err, (size_t)start, m_grid->dy());
-    err.set_name("dz");
-    io::write_timeseries(nc, err, (size_t)start, m_grid->dz_max());
+      // Write the dimension variable:
+      io::write_timeseries(nc, err, (size_t)start, (double)(start + 1), PISM_INT);
 
-    // Always write the test name:
-    err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
-    err.set_name("test");
-    io::write_timeseries(nc, err, (size_t)start, (double)m_testname, PISM_BYTE);
-  }
+      // Always write grid parameters:
+      err.set_name("dx");
+      err.set_string("units", "meters");
+      io::write_timeseries(nc, err, (size_t)start, m_grid->dx());
+      err.set_name("dy");
+      io::write_timeseries(nc, err, (size_t)start, m_grid->dy());
+      err.set_name("dz");
+      io::write_timeseries(nc, err, (size_t)start, m_grid->dz_max());
 
-  // geometry (thickness, vol) errors if appropriate; reported in m except for relmaxETA
-  if ((m_testname != 'K') && (m_testname != 'O')) {
-    double volexact, areaexact, domeHexact, volerr, areaerr, maxHerr, avHerr,
-                maxetaerr, centerHerr;
-    computeGeometryErrors(volexact,areaexact,domeHexact,
-                          volerr,areaerr,maxHerr,avHerr,maxetaerr,centerHerr);
-    m_log->message(1,
-               "geometry  :    prcntVOL        maxH         avH   relmaxETA\n");  // no longer reporting centerHerr
-    const double   m = (2.0 * flow_law->exponent() + 2.0) / flow_law->exponent();
-    m_log->message(1, "           %12.6f%12.6f%12.6f%12.6f\n",
-               100*volerr/volexact, maxHerr, avHerr,
-               maxetaerr/pow(domeHexact,m));
+      // Always write the test name:
+      err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
+      err.set_name("test");
+      io::write_timeseries(nc, err, (size_t)start, (double)m_testname, PISM_BYTE);
+    }
 
-    if (report_file.is_set()) {
+
+    // geometry (thickness, vol) errors if appropriate; reported in m except for relmaxETA
+    if ((m_testname != 'K') && (m_testname != 'O')) {
       err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
       err.set_name("relative_volume");
       err.set_string("units", "percent");
@@ -710,19 +781,9 @@ void IceCompModel::reportErrors() {
       err.set_string("long_name", "average ice thickness error");
       io::write_timeseries(nc, err, (size_t)start, avHerr);
     }
-  }
 
-  // temperature errors for F and G
-  if ((m_testname == 'F') || (m_testname == 'G')) {
-    double maxTerr, avTerr, basemaxTerr, baseavTerr, basecenterTerr;
-    computeTemperatureErrors(maxTerr, avTerr);
-    computeBasalTemperatureErrors(basemaxTerr, baseavTerr, basecenterTerr);
-    m_log->message(1,
-               "temp      :        maxT         avT    basemaxT     baseavT\n");  // no longer reporting   basecenterT
-    m_log->message(1, "           %12.6f%12.6f%12.6f%12.6f\n",
-               maxTerr, avTerr, basemaxTerr, baseavTerr);
-
-    if (report_file.is_set()) {
+    // temperature errors for F and G
+    if ((m_testname == 'F') || (m_testname == 'G')) {
       err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
       err.set_name("maximum_temperature");
       err.set_string("units", "Kelvin");
@@ -739,17 +800,8 @@ void IceCompModel::reportErrors() {
       err.set_name("average_basal_temperature");
       err.set_string("long_name", "average basal temperature error");
       io::write_timeseries(nc, err, (size_t)start, baseavTerr);
-    }
 
-  } else if ((m_testname == 'K') || (m_testname == 'O')) {
-    double maxTerr, avTerr, maxTberr, avTberr;
-    computeIceBedrockTemperatureErrors(maxTerr, avTerr, maxTberr, avTberr);
-    m_log->message(1,
-               "temp      :        maxT         avT       maxTb        avTb\n");
-    m_log->message(1, "           %12.6f%12.6f%12.6f%12.6f\n",
-               maxTerr, avTerr, maxTberr, avTberr);
-
-    if (report_file.is_set()) {
+    } else if ((m_testname == 'K') || (m_testname == 'O')) {
       err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
       err.set_name("maximum_temperature");
       err.set_string("units", "Kelvin");
@@ -768,18 +820,9 @@ void IceCompModel::reportErrors() {
       err.set_string("long_name", "average bedrock temperature error");
       io::write_timeseries(nc, err, (size_t)start, avTberr);
     }
-  }
 
-  // strain_heating errors if appropriate; reported in 10^6 J/(s m^3)
-  if ((m_testname == 'F') || (m_testname == 'G')) {
-    double max_strain_heating_error, av_strain_heating_error;
-    compute_strain_heating_errors(max_strain_heating_error, av_strain_heating_error);
-    m_log->message(1,
-               "Sigma     :      maxSig       avSig\n");
-    m_log->message(1, "           %12.6f%12.6f\n",
-               max_strain_heating_error*1.0e6, av_strain_heating_error*1.0e6);
-
-    if (report_file.is_set()) {
+    // strain_heating errors if appropriate; reported in 10^6 J/(s m^3)
+    if ((m_testname == 'F') || (m_testname == 'G')) {
       err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
       err.set_name("maximum_sigma");
       err.set_string("units", "J s-1 m-3");
@@ -791,22 +834,9 @@ void IceCompModel::reportErrors() {
       err.set_string("long_name", "average strain heating error");
       io::write_timeseries(nc, err, (size_t)start, av_strain_heating_error);
     }
-  }
 
-  // surface velocity errors if exact values are available; reported in m year-1
-  if ((m_testname == 'F') || (m_testname == 'G')) {
-    double maxUerr, avUerr, maxWerr, avWerr;
-    computeSurfaceVelocityErrors(maxUerr, avUerr, maxWerr, avWerr);
-    m_log->message(1,
-               "surf vels :     maxUvec      avUvec        maxW         avW\n");
-    m_log->message(1,
-               "           %12.6f%12.6f%12.6f%12.6f\n",
-               convert(m_sys, maxUerr, "m second-1", "m year-1"),
-               convert(m_sys, avUerr, "m second-1", "m year-1"),
-               convert(m_sys, maxWerr, "m second-1", "m year-1"),
-               convert(m_sys, avWerr, "m second-1", "m year-1"));
-
-    if (report_file.is_set()) {
+    // surface velocity errors if exact values are available; reported in m year-1
+    if ((m_testname == 'F') || (m_testname == 'G')) {
       err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
       err.set_name("maximum_surface_velocity");
       err.set_string("long_name", "maximum ice surface horizontal velocity error");
@@ -826,38 +856,16 @@ void IceCompModel::reportErrors() {
       err.set_string("long_name", "average ice surface vertical velocity error");
       io::write_timeseries(nc, err, (size_t)start, avWerr);
     }
-  }
 
-  // basal melt rate errors if appropriate; reported in m year-1
-  if (m_testname == 'O') {
-    double maxbmelterr, minbmelterr;
-    computeBasalMeltRateErrors(maxbmelterr, minbmelterr);
-    if (maxbmelterr != minbmelterr) {
-      m_log->message(1,
-                 "IceCompModel WARNING: unexpected Test O situation: max and min of bmelt error\n"
-                 "  are different: maxbmelterr = %f, minbmelterr = %f\n",
-                 convert(m_sys, maxbmelterr, "m second-1", "m year-1"),
-                 convert(m_sys, minbmelterr, "m second-1", "m year-1"));
-    }
-    m_log->message(1,
-               "basal melt:  max\n");
-    m_log->message(1, "           %11.5f\n",
-               convert(m_sys, maxbmelterr, "m second-1", "m year-1"));
-
-    if (report_file.is_set()) {
+    // basal melt rate errors if appropriate; reported in m year-1
+    if (m_testname == 'O') {
       err.clear_all_strings(); err.clear_all_doubles(); err.set_string("units", "1");
       err.set_name("maximum_basal_melt_rate");
       err.set_string("units", "m second-1");
       err.set_string("glaciological_units", "meters year-1");
       io::write_timeseries(nc, err, (size_t)start, maxbmelterr);
     }
-  }
-
-  if (report_file.is_set()) {
-    nc.close();
-  }
-
-  m_log->message(1, "NUM ERRORS DONE\n");
+  } // end of "if (report_file.is_set())"
 }
 
 //! \brief Initialize test V.

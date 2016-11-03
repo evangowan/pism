@@ -53,8 +53,7 @@ periodicity = PISM.XY_PERIODIC
 if is_regional:
     periodicity = PISM.NOT_PERIODIC
 
-input_file = PISM.PIO(ctx.com(), "netcdf3")
-input_file.open(input_filename, PISM.PISM_READONLY)
+input_file = PISM.PIO(ctx.com(), "netcdf3", input_filename, PISM.PISM_READONLY)
 grid = PISM.IceGrid.FromFile(ctx, input_file, "enthalpy", periodicity)
 
 config.set_boolean("basal_resistance.pseudo_plastic.enabled", False)
@@ -100,8 +99,7 @@ PISM.verbPrintf(2, context.com, "* Computing SIA velocities...\n")
 vel_sia = PISM.sia.computeSIASurfaceVelocities(modeldata, siasolver=solver)
 
 PISM.verbPrintf(2, context.com, "* Saving results to %s...\n" % output_file)
-pio = PISM.util.prepare_output(output_file)
-pio.close()
+PISM.util.prepare_output(output_file)
 
 # Save time & command line & results
 PISM.util.writeProvenance(output_file)

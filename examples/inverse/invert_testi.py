@@ -282,8 +282,7 @@ if __name__ == "__main__":
         exit(0)
 
     # Setup the output file.
-    pio = PISM.util.prepare_output(output_file)
-
+    PISM.util.prepare_output(output_file)
     zeta0.write(output_file)
 
     # Send the true yeild stress through the forward problem to

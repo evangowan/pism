@@ -106,10 +106,10 @@ void IceModel::model_state_setup() {
 
   const bool use_input_file = input.type == INIT_BOOTSTRAP or input.type == INIT_RESTART;
 
-  PIO input_file(m_grid->com, "guess_mode");
+  PISM_SHARED_PTR(PIO) input_file;
 
   if (use_input_file) {
-    input_file.open(input.filename, PISM_READONLY);
+    input_file.reset(new PIO(m_grid->com, "guess_mode", input.filename, PISM_READONLY));
   }
 
   // Get projection information and compute cell areas and lat/lon *before* a component decides to
@@ -117,7 +117,7 @@ void IceModel::model_state_setup() {
   {
     if (use_input_file) {
       std::string mapping_name = m_grid->get_mapping_info().mapping.get_name();
-      MappingInfo info = get_projection_info(input_file, mapping_name,
+      MappingInfo info = get_projection_info(*input_file, mapping_name,
                                              m_ctx->unit_system());
 
       if (not info.proj4.empty()) {
@@ -128,9 +128,13 @@ void IceModel::model_state_setup() {
       m_output_global_attributes.set_string("proj4", info.proj4);
       m_grid->set_mapping_info(info);
 
-      std::string history = input_file.get_att_text("PISM_GLOBAL", "history");
+      std::string history = input_file->get_att_text("PISM_GLOBAL", "history");
       m_output_global_attributes.set_string("history",
                                             history + m_output_global_attributes.get_string("history"));
+
+      initialize_cumulative_fluxes(*input_file);
+    } else {
+      reset_cumulative_fluxes();
     }
 
     compute_cell_areas();
@@ -140,10 +144,10 @@ void IceModel::model_state_setup() {
   {
     switch (input.type) {
     case INIT_RESTART:
-      restart_2d(input_file, input.record);
+      restart_2d(*input_file, input.record);
       break;
     case INIT_BOOTSTRAP:
-      bootstrap_2d(input_file);
+      bootstrap_2d(*input_file);
       break;
     case INIT_OTHER:
     default:
@@ -222,14 +226,14 @@ void IceModel::model_state_setup() {
     switch (input.type) {
     case INIT_RESTART:
       {
-        m_energy_model->restart(input_file, input.record);
+        m_energy_model->restart(*input_file, input.record);
         break;
       }
     case INIT_BOOTSTRAP:
       {
         m_surface->ice_surface_temperature(ice_surface_temperature);
         m_surface->ice_surface_mass_flux(climatic_mass_balance);
-        m_energy_model->bootstrap(input_file,
+        m_energy_model->bootstrap(*input_file,
                                   m_ice_thickness,
                                   ice_surface_temperature,
                                   climatic_mass_balance,
@@ -261,17 +265,6 @@ void IceModel::model_state_setup() {
   // miscellaneous steps
   {
     reset_counters();
-
-    if (use_input_file) {
-      std::string history = input_file.get_att_text("PISM_GLOBAL", "history");
-      m_output_global_attributes.set_string("history",
-                                            history + m_output_global_attributes.get_string("history"));
-
-      initialize_cumulative_fluxes(input_file);
-    } else {
-      reset_cumulative_fluxes();
-    }
-
     stampHistoryCommand();
   }
 }
@@ -622,9 +615,8 @@ void IceModel::misc_setup() {
 
   if (not (opts.type == INIT_OTHER)) {
     // initializing from a file
-    PIO nc(m_grid->com, "guess_mode");
+    PIO nc(m_grid->com, "guess_mode", opts.filename, PISM_READONLY);
 
-    nc.open(opts.filename, PISM_READONLY);
     std::string source = nc.get_att_text("PISM_GLOBAL", "source");
 
     if (opts.type == INIT_RESTART) {

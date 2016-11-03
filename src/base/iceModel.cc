@@ -202,7 +202,7 @@ IceModel::IceModel(IceGrid::Ptr g, Context::Ptr context)
   m_frontal_melt                = NULL;
 
   m_output_global_attributes.set_string("Conventions", "CF-1.5");
-  m_output_global_attributes.set_string("source", std::string("PISM ") + PISM_Revision);
+  m_output_global_attributes.set_string("source", pism::version());
 
   // Do not save snapshots by default:
   m_save_snapshots = false;
