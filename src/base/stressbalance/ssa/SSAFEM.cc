@@ -150,11 +150,6 @@ void SSAFEM::init_impl() {
   // and the call below clears SSAX.
 
   m_velocity_global.copy_from(m_velocity);
-
-  // Store coefficient data at the element nodes.
-  StressBalanceInputs inputs;
-  // FIXME: this will segfault
-  cache_inputs(inputs);
 }
 
 /**  Solve the SSA system of equations.
@@ -1194,5 +1189,46 @@ PetscErrorCode SSAFEM::jacobian_callback(DMDALocalInfo *info,
   return 0;
 }
 #endif
+
+SSAFEM_Inverse::SSAFEM_Inverse(IceGrid::ConstPtr g)
+  : SSAFEM(g) {
+  // empty
+}
+
+void SSAFEM_Inverse::init_impl() {
+  SSAFEM::init_impl();
+
+  // Store coefficient data at the element nodes.
+  StressBalanceInputs inputs;
+  {
+    // geometry
+    inputs.ice_thickness          = m_grid->variables().get_2d_scalar("land_ice_thickness");
+    inputs.bed_elevation          = m_grid->variables().get_2d_scalar("bedrock_altitude");
+    inputs.surface_elevation      = m_grid->variables().get_2d_scalar("surface_altitude");
+    inputs.cell_type              = m_grid->variables().get_2d_cell_type("mask");
+    inputs.grounded_cell_fraction = NULL;
+
+    // energy
+    inputs.ice_enthalpy = m_grid->variables().get_3d_scalar("enthalpy");
+
+    // velocity
+    inputs.basal_melt_rate = NULL;
+
+    // boundary conditions
+    inputs.melange_back_pressure = NULL;
+    inputs.basal_yield_stress = m_grid->variables().get_2d_scalar("tauc");
+
+    inputs.fracture_density = NULL;
+
+    // direct specification of the driving stress
+    inputs.driving_stress_x = NULL;
+    inputs.driving_stress_y = NULL;
+
+    // FIXME: we should use the real sea level
+    inputs.sea_level = 0.0;
+  }
+  cache_inputs(inputs);
+}
+
 } // end of namespace stressbalance
 } // end of namespace pism

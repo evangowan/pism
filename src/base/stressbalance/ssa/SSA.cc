@@ -403,7 +403,9 @@ IceModelVec::Ptr SSA_taud::compute_impl() {
   result->metadata(1) = m_vars[1];
 
   StressBalanceInputs inputs;
-  // FIXME: this will segfault
+  inputs.ice_thickness = m_grid->variables().get_2d_scalar("land_ice_thickness");
+  inputs.bed_elevation = m_grid->variables().get_2d_scalar("bedrock_altitude");
+  inputs.surface_elevation = m_grid->variables().get_2d_scalar("surface_altitude");
   model->compute_driving_stress(inputs, *result);
 
   return result;

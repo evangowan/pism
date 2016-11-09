@@ -165,6 +165,16 @@ static PetscErrorCode function_callback(DMDALocalInfo *info,
 
 };
 
+//! The SSAFEM derived class used by inversion tools.
+/*!
+ * Caches inputs in init_impl() instead of doing it in update().
+ */
+class SSAFEM_Inverse : public SSAFEM {
+public:
+  SSAFEM_Inverse(IceGrid::ConstPtr g);
+protected:
+  virtual void init_impl();
+};
 
 } // end of namespace stressbalance
 } // end of namespace pism

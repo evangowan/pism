@@ -31,7 +31,7 @@ namespace inverse {
 
 IP_SSATaucForwardProblem::IP_SSATaucForwardProblem(IceGrid::ConstPtr g,
                                                    IPDesignVariableParameterization &tp)
-  : SSAFEM(g),
+  : SSAFEM_Inverse(g),
     m_zeta(NULL),
     m_fixed_tauc_locations(NULL),
     m_tauc_param(tp),

@@ -33,7 +33,7 @@ namespace inverse {
 
 IP_SSAHardavForwardProblem::IP_SSAHardavForwardProblem(IceGrid::ConstPtr g,
                                                        IPDesignVariableParameterization &tp)
-  : SSAFEM(g),
+  : SSAFEM_Inverse(g),
     m_zeta(NULL),
     m_fixed_design_locations(NULL),
     m_design_param(tp),

@@ -166,9 +166,34 @@ void SSATestCase::run() {
   m_ctx->log()->message(2, "* Solving the SSA stress balance ...\n");
 
   bool fast = false;
+
   StressBalanceInputs inputs;
-  inputs.sea_level = 0.0;
-  inputs.melange_back_pressure = &m_melange_back_pressure;
+  {
+    // geometry
+    inputs.ice_thickness          = m_grid->variables().get_2d_scalar("land_ice_thickness");
+    inputs.bed_elevation          = m_grid->variables().get_2d_scalar("bedrock_altitude");
+    inputs.surface_elevation      = m_grid->variables().get_2d_scalar("surface_altitude");
+    inputs.cell_type              = m_grid->variables().get_2d_cell_type("mask");
+    inputs.grounded_cell_fraction = NULL;
+
+    // energy
+    inputs.ice_enthalpy = m_grid->variables().get_3d_scalar("enthalpy");
+
+    // velocity
+    inputs.basal_melt_rate = NULL;
+
+    // boundary conditions
+    inputs.melange_back_pressure = &m_melange_back_pressure;
+    inputs.basal_yield_stress = m_grid->variables().get_2d_scalar("tauc");
+
+    inputs.fracture_density = NULL;
+
+    // direct specification of the driving stress
+    inputs.driving_stress_x = NULL;
+    inputs.driving_stress_y = NULL;
+
+    inputs.sea_level = 0.0;
+  }
   m_ssa->update(fast, inputs);
 }
 

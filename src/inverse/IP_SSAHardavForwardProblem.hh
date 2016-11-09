@@ -100,7 +100,7 @@ namespace inverse {
   methods require the transpose of this map; to apply \f$DF^t\f$ to \f$du\f$ use
   \ref apply_linearization_transpose.
 */
-class IP_SSAHardavForwardProblem : public stressbalance::SSAFEM
+class IP_SSAHardavForwardProblem : public stressbalance::SSAFEM_Inverse
 {
 public:
 
