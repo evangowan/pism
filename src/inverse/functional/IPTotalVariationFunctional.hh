@@ -1,4 +1,4 @@
-// Copyright (C) 2013, 2014, 2015  David Maxwell and Constantine Khroulev
+// Copyright (C) 2013, 2014, 2015, 2016  David Maxwell and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -33,7 +33,7 @@ namespace inverse {
 */
 class IPTotalVariationFunctional2S : public IPFunctional<IceModelVec2S> {
 public:
-  IPTotalVariationFunctional2S(IceGrid::ConstPtr grid, double c, double q, double eps, IceModelVec2Int *dirichletLocations=NULL);
+  IPTotalVariationFunctional2S(IceGrid::ConstPtr grid, double c, double q, double eps, IceModelVec2Int *dirichlet_locations=NULL);
 
   virtual void valueAt(IceModelVec2S &x, double *OUTPUT);
   virtual void gradientAt(IceModelVec2S &x, IceModelVec2S &gradient);

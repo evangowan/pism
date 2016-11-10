@@ -39,17 +39,17 @@ namespace inverse {
   derivatives in parameters that can occur at the transition between icy/non-icy regions.
   Integration can be 'restricted', in a sense, to a subset of the domain
   using a projection that forces \f$f\f$ to equal zero at nodes specified
-  by the constructor argument \a dirichletLocations.
+  by the constructor argument \a dirichlet_locations.
 */
 class IPGroundedIceH1NormFunctional2S : public IPInnerProductFunctional<IceModelVec2S> {
 public:
   IPGroundedIceH1NormFunctional2S(IceGrid::ConstPtr grid, double cL2, 
                                   double cH1, IceModelVec2CellType &ice_mask,
-                                  IceModelVec2Int *dirichletLocations=NULL)
+                                  IceModelVec2Int *dirichlet_locations=NULL)
     : IPInnerProductFunctional<IceModelVec2S>(grid),
     m_cL2(cL2),
     m_cH1(cH1),
-    m_dirichletIndices(dirichletLocations),
+    m_dirichletIndices(dirichlet_locations),
     m_ice_mask(ice_mask) {};
   virtual ~IPGroundedIceH1NormFunctional2S() {};
   

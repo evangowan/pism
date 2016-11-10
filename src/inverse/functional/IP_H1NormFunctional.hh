@@ -1,4 +1,4 @@
-// Copyright (C) 2012, 2013, 2014, 2015  David Maxwell and Constantine Khroulev
+// Copyright (C) 2012, 2013, 2014, 2015, 2016  David Maxwell and Constantine Khroulev
 //
 // This file is part of PISM.
 //
@@ -33,17 +33,17 @@ namespace inverse {
   where \f$\Omega\f$ is the square domain. Numerically it is implemented using 
   Q1 finite elements.  Integration can be 'restricted', in a sense, to a subset of the domain
   using a projection that forces \f$f\f$ to equal zero at nodes specified
-  by the constructor argument \a dirichletLocations.
+  by the constructor argument \a dirichlet_locations.
 */
 class IP_H1NormFunctional2S : public IPInnerProductFunctional<IceModelVec2S> {
 public:
   IP_H1NormFunctional2S(IceGrid::ConstPtr grid, ///< computational grid
                         double cL2, ///< The constant \f$c_{L^2}\f$.
                         double cH1, ///< The constant \f$c_{H^1}\f$.
-                        IceModelVec2Int *dirichletLocations=NULL ///< Nodes where the function will be set to zero prior to integration.
+                        IceModelVec2Int *dirichlet_locations=NULL ///< Nodes where the function will be set to zero prior to integration.
                         ) :
     IPInnerProductFunctional<IceModelVec2S>(grid),
-    m_cL2(cL2), m_cH1(cH1), m_dirichletIndices(dirichletLocations) {};
+    m_cL2(cL2), m_cH1(cH1), m_dirichletIndices(dirichlet_locations) {};
   virtual ~IP_H1NormFunctional2S() {};
   
   virtual void valueAt(IceModelVec2S &x, double *OUTPUT);

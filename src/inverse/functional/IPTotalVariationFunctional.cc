@@ -26,8 +26,8 @@ namespace inverse {
 
 IPTotalVariationFunctional2S::IPTotalVariationFunctional2S(IceGrid::ConstPtr grid,
                                                            double c, double exponent, double eps,
-                                                           IceModelVec2Int *dirichletLocations) :
-    IPFunctional<IceModelVec2S>(grid), m_dirichletIndices(dirichletLocations),
+                                                           IceModelVec2Int *dirichlet_locations) :
+    IPFunctional<IceModelVec2S>(grid), m_dirichletIndices(dirichlet_locations),
     m_c(c), m_lebesgue_exp(exponent), m_epsilon_sq(eps*eps) {
 }
 

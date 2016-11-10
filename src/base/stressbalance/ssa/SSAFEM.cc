@@ -50,7 +50,7 @@ SSAFEM::SSAFEM(IceGrid::ConstPtr g)
 
   PetscErrorCode ierr;
 
-  m_dirichletScale = 1.0;
+  m_dirichlet_scale = 1.0;
   m_beta_ice_free_bedrock = m_config->get_double("basal_resistance.beta_ice_free_bedrock");
 
   ierr = SNESCreate(m_grid->com, m_snes.rawptr());
@@ -137,10 +137,10 @@ void SSAFEM::init_impl() {
 
   // process command-line options
   {
-    m_dirichletScale = 1.0e9;
-    m_dirichletScale = options::Real("-ssa_fe_dirichlet_scale",
+    m_dirichlet_scale = 1.0e9;
+    m_dirichlet_scale = options::Real("-ssa_fe_dirichlet_scale",
                                      "Enforce Dirichlet conditions with this additional scaling",
-                                     m_dirichletScale);
+                                     m_dirichlet_scale);
 
   }
 
@@ -702,7 +702,7 @@ void SSAFEM::compute_local_function(Vector2 const *const *const velocity_global,
   }
 
   // Start access to Dirichlet data if present.
-  fem::DirichletData_Vector dirichlet_data(m_bc_mask, m_bc_values, m_dirichletScale);
+  fem::DirichletData_Vector dirichlet_data(m_bc_mask, m_bc_values, m_dirichlet_scale);
 
   // Storage for the current solution and its derivatives at quadrature points.
   Vector2 U[Nq_max], U_x[Nq_max], U_y[Nq_max];
@@ -841,7 +841,7 @@ void SSAFEM::compute_local_function(Vector2 const *const *const velocity_global,
     // Prescribe homogeneous Dirichlet B.C. at ice-free nodes. This uses the fact that m_node_type
     // can be used as a "Dirichlet B.C. mask", i.e. ice-free nodes (and only ice-free nodes) are
     // marked with ones.
-    fem::DirichletData_Vector dirichlet_ice_free(&m_node_type, NULL, m_dirichletScale);
+    fem::DirichletData_Vector dirichlet_ice_free(&m_node_type, NULL, m_dirichlet_scale);
     dirichlet_ice_free.fix_residual_homogeneous(residual_global);
   }
 
@@ -912,7 +912,7 @@ void SSAFEM::compute_local_jacobian(Vector2 const *const *const velocity_global,
   list.add(m_coefficients);
 
   // Start access to Dirichlet data if present.
-  fem::DirichletData_Vector dirichlet_data(m_bc_mask, m_bc_values, m_dirichletScale);
+  fem::DirichletData_Vector dirichlet_data(m_bc_mask, m_bc_values, m_dirichlet_scale);
 
   // Storage for the current solution at quadrature points.
   Vector2 U[Nq_max], U_x[Nq_max], U_y[Nq_max];
@@ -1078,7 +1078,7 @@ void SSAFEM::compute_local_jacobian(Vector2 const *const *const velocity_global,
     // Prescribe homogeneous Dirichlet B.C. at ice-free nodes. This uses the fact that m_node_type
     // can be used as a "Dirichlet B.C. mask", i.e. ice-free nodes (and only ice-free nodes) are
     // marked with ones.
-    fem::DirichletData_Vector dirichlet_ice_free(&m_node_type, NULL, m_dirichletScale);
+    fem::DirichletData_Vector dirichlet_ice_free(&m_node_type, NULL, m_dirichlet_scale);
     dirichlet_ice_free.fix_jacobian(Jac);
   }
 
