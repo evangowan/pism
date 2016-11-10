@@ -1201,28 +1201,40 @@ void SSAFEM_Inverse::init_impl() {
   // Store coefficient data at the element nodes.
   StressBalanceInputs inputs;
   {
+    const Vars& variables = m_grid->variables();
     // geometry
-    inputs.ice_thickness          = m_grid->variables().get_2d_scalar("land_ice_thickness");
-    inputs.bed_elevation          = m_grid->variables().get_2d_scalar("bedrock_altitude");
-    inputs.surface_elevation      = m_grid->variables().get_2d_scalar("surface_altitude");
-    inputs.cell_type              = m_grid->variables().get_2d_cell_type("mask");
+    inputs.ice_thickness          = variables.get_2d_scalar("land_ice_thickness");
+    inputs.bed_elevation          = variables.get_2d_scalar("bedrock_altitude");
+    inputs.cell_type              = variables.get_2d_cell_type("mask");
+    // grounded cell fraction is not used by SSAFEM
     inputs.grounded_cell_fraction = NULL;
 
-    // energy
-    inputs.ice_enthalpy = m_grid->variables().get_3d_scalar("enthalpy");
+    // either surface_altitude or the pair of driving_stress_{x,y} is required
+    if (variables.is_available("surface_altitude")) {
+      inputs.surface_elevation = variables.get_2d_scalar("surface_altitude");
+      m_log->message(2, "  using surface_altitude to compute driving stress...\n");
+    } else if (variables.is_available("ssa_driving_stress_x") and
+               variables.is_available("ssa_driving_stress_y")) {
+      inputs.driving_stress_x = variables.get_2d_scalar("ssa_driving_stress_x");
+      inputs.driving_stress_y = variables.get_2d_scalar("ssa_driving_stress_y");
+      m_log->message(2, "  using provided driving stress...\n");
+    } else {
+      throw RuntimeError::formatted(PISM_ERROR_LOCATION,
+                                    "neither surface_altitude nor driving_stress_[xy] was provided");
+    }
 
-    // velocity
+    // energy
+    inputs.ice_enthalpy = variables.get_3d_scalar("enthalpy");
+
+    // basal melt rate is not used by shallow stress balances
     inputs.basal_melt_rate = NULL;
 
     // boundary conditions
     inputs.melange_back_pressure = NULL;
-    inputs.basal_yield_stress = m_grid->variables().get_2d_scalar("tauc");
+    inputs.basal_yield_stress = variables.get_2d_scalar("tauc");
 
+    // fracture density is not used by SSAFEM
     inputs.fracture_density = NULL;
-
-    // direct specification of the driving stress
-    inputs.driving_stress_x = NULL;
-    inputs.driving_stress_y = NULL;
 
     // FIXME: we should use the real sea level
     inputs.sea_level = 0.0;
