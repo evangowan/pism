@@ -40,34 +40,28 @@ void SSATestCase::buildSSACoefficients()
   m_surface.create(m_grid, "usurf", WITH_GHOSTS, WIDE_STENCIL);
   m_surface.set_attrs("diagnostic", "ice upper surface elevation", "m",
                       "surface_altitude");
-  m_grid->variables().add(m_surface);
 
   // land ice thickness
   m_thickness.create(m_grid, "thk", WITH_GHOSTS, WIDE_STENCIL);
   m_thickness.set_attrs("model_state", "land ice thickness", "m",
                         "land_ice_thickness");
   m_thickness.metadata().set_double("valid_min", 0.0);
-  m_grid->variables().add(m_thickness);
 
   // bedrock surface elevation
   m_bed.create(m_grid, "topg", WITH_GHOSTS, WIDE_STENCIL);
   m_bed.set_attrs("model_state", "bedrock surface elevation", "m",
                   "bedrock_altitude");
-  m_grid->variables().add(m_bed);
 
   // yield stress for basal till (plastic or pseudo-plastic model)
   m_tauc.create(m_grid, "tauc", WITH_GHOSTS, WIDE_STENCIL);
   m_tauc.set_attrs("diagnostic",
                    "yield stress for basal till (plastic or pseudo-plastic model)", "Pa", "");
-  m_grid->variables().add(m_tauc);
 
   // enthalpy
   m_ice_enthalpy.create(m_grid, "enthalpy", WITH_GHOSTS, WIDE_STENCIL);
   m_ice_enthalpy.set_attrs("model_state",
                        "ice enthalpy (includes sensible heat, latent heat, pressure)",
                        "J kg-1", "");
-  m_grid->variables().add(m_ice_enthalpy);
-
 
   // dirichlet boundary condition (FIXME: perhaps unused!)
   m_bc_values.create(m_grid, "_bc", WITH_GHOSTS, WIDE_STENCIL); // u_bc and v_bc
@@ -107,7 +101,6 @@ void SSATestCase::buildSSACoefficients()
   m_ice_mask.metadata().set_doubles("flag_values", mask_values);
   m_ice_mask.metadata().set_string("flag_meanings",
                                    "ice_free_bedrock grounded_ice floating_ice ice_free_ocean");
-  m_grid->variables().add(m_ice_mask);
 
   m_ice_mask.set(MASK_GROUNDED);
 
@@ -121,7 +114,6 @@ void SSATestCase::buildSSACoefficients()
   m_bc_mask.metadata().set_doubles("flag_values", mask_values);
   m_bc_mask.metadata().set_string("flag_meanings",
                                   "no_data ssa.dirichlet_bc_location");
-  m_grid->variables().add(m_bc_mask);
 
   m_melange_back_pressure.create(m_grid, "melange_back_pressure_fraction",
                                  WITH_GHOSTS, WIDE_STENCIL);
@@ -170,21 +162,21 @@ void SSATestCase::run() {
   StressBalanceInputs inputs;
   {
     // geometry
-    inputs.ice_thickness          = m_grid->variables().get_2d_scalar("land_ice_thickness");
-    inputs.bed_elevation          = m_grid->variables().get_2d_scalar("bedrock_altitude");
-    inputs.surface_elevation      = m_grid->variables().get_2d_scalar("surface_altitude");
-    inputs.cell_type              = m_grid->variables().get_2d_cell_type("mask");
+    inputs.ice_thickness          = &m_thickness;
+    inputs.bed_elevation          = &m_bed;
+    inputs.surface_elevation      = &m_surface;
+    inputs.cell_type              = &m_ice_mask;
     inputs.grounded_cell_fraction = NULL;
 
     // energy
-    inputs.ice_enthalpy = m_grid->variables().get_3d_scalar("enthalpy");
+    inputs.ice_enthalpy = &m_ice_enthalpy;
 
     // velocity
     inputs.basal_melt_rate = NULL;
 
     // boundary conditions
     inputs.melange_back_pressure = &m_melange_back_pressure;
-    inputs.basal_yield_stress = m_grid->variables().get_2d_scalar("tauc");
+    inputs.basal_yield_stress    = &m_tauc;
 
     inputs.fracture_density = NULL;
 
@@ -193,6 +185,9 @@ void SSATestCase::run() {
     inputs.driving_stress_y = NULL;
 
     inputs.sea_level = 0.0;
+
+    inputs.bc_mask   = &m_bc_mask;
+    inputs.bc_values = &m_bc_values;
   }
   m_ssa->update(fast, inputs);
 }

@@ -71,6 +71,10 @@ protected:
   double m_rho_g;
 
   IceModelVec2Fat<Coefficients> m_coefficients;
+  // These could be rolled into m_coefficients, but it's easier to keep them separate because of the
+  // way DirichletData works.
+  const IceModelVec2Int *m_bc_mask;
+  const IceModelVec2V   *m_bc_values;
 
   void quad_point_values(const fem::Quadrature &Q,
                          const Coefficients *x,

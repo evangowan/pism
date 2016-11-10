@@ -47,6 +47,9 @@ public:
 
   // velocity
   const IceModelVec2S *basal_melt_rate;
+  // 2D Dirichlet boundary conditions
+  const IceModelVec2Int *bc_mask;
+  const IceModelVec2V   *bc_values;
 
   // boundary conditions
   const IceModelVec2S *melange_back_pressure;

@@ -151,8 +151,6 @@ void SSATestCasePlug::initializeSSACoefficients() {
   m_bc_mask.update_ghosts();
   m_bed.update_ghosts();
   m_surface.update_ghosts();
-
-  m_ssa->set_boundary_conditions(m_bc_mask, m_bc_values);
 }
 
 void SSATestCasePlug::exactSolution(int /*i*/, int /*j*/,

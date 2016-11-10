@@ -295,9 +295,9 @@ void SSAFD::assemble_rhs(const StressBalanceInputs &inputs) {
   list.add(m_taud);
   list.add(m_b);
 
-  if (m_bc_values && m_bc_mask) {
-    list.add(*m_bc_values);
-    list.add(*m_bc_mask);
+  if (inputs.bc_values && inputs.bc_mask) {
+    list.add(*inputs.bc_values);
+    list.add(*inputs.bc_mask);
   }
 
   if (use_cfbc) {
@@ -313,10 +313,10 @@ void SSAFD::assemble_rhs(const StressBalanceInputs &inputs) {
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
 
-    if (m_bc_values != NULL &&
-        m_bc_mask->as_int(i, j) == 1) {
-      m_b(i, j).u = m_scaling * (*m_bc_values)(i, j).u;
-      m_b(i, j).v = m_scaling * (*m_bc_values)(i, j).v;
+    if (inputs.bc_values != NULL &&
+        inputs.bc_mask->as_int(i, j) == 1) {
+      m_b(i, j).u = m_scaling * (*inputs.bc_values)(i, j).u;
+      m_b(i, j).v = m_scaling * (*inputs.bc_values)(i, j).v;
       continue;
     }
 
@@ -362,7 +362,8 @@ void SSAFD::assemble_rhs(const StressBalanceInputs &inputs) {
         }
 
         double ocean_pressure = ocean_pressure_difference(ocean(M_ij), is_dry_simulation,
-                                                          H_ij, (*inputs.bed_elevation)(i,j), m_sea_level,
+                                                          H_ij, (*inputs.bed_elevation)(i,j),
+                                                          inputs.sea_level,
                                                           rho_ice, rho_ocean, standard_gravity);
 
         if (inputs.melange_back_pressure != NULL) {
@@ -495,8 +496,8 @@ void SSAFD::assemble_matrix(const StressBalanceInputs &inputs, bool include_basa
   list.add(vel);
   list.add(m_mask);
 
-  if (m_bc_values && m_bc_mask) {
-    list.add(*m_bc_mask);
+  if (inputs.bc_values && inputs.bc_mask) {
+    list.add(*inputs.bc_mask);
   }
 
   const bool sub_gl = inputs.grounded_cell_fraction != NULL;
@@ -521,7 +522,7 @@ void SSAFD::assemble_matrix(const StressBalanceInputs &inputs, bool include_basa
       const int i = p.i(), j = p.j();
 
       // Handle the easy case: provided Dirichlet boundary conditions
-      if (m_bc_values && m_bc_mask && m_bc_mask->as_int(i,j) == 1) {
+      if (inputs.bc_values && inputs.bc_mask && inputs.bc_mask->as_int(i,j) == 1) {
         // set diagonal entry to one (scaled); RHS entry will be known velocity;
         set_diagonal_matrix_entry(A, i, j, m_scaling);
         continue;

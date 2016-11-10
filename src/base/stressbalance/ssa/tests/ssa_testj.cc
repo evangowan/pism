@@ -128,8 +128,6 @@ void SSATestCaseJ::initializeSSACoefficients() {
   m_thickness.update_ghosts();
   m_bc_mask.update_ghosts();
   m_bc_values.update_ghosts();
-
-  m_ssa->set_boundary_conditions(m_bc_mask, m_bc_values);
 }
 
 void SSATestCaseJ::exactSolution(int /*i*/, int /*j*/,

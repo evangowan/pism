@@ -264,6 +264,10 @@ TerminationReason::Ptr SSAFEM::solve_nocache() {
 void SSAFEM::cache_inputs(const StressBalanceInputs &inputs) {
   const std::vector<double> &z = m_grid->z();
 
+  // "cache" pointers to Dirichlet B.C. data
+  m_bc_mask   = inputs.bc_mask;
+  m_bc_values = inputs.bc_values;
+
   m_use_explicit_driving_stress = ((inputs.driving_stress_x != NULL) &&
                                    (inputs.driving_stress_y != NULL));
 
@@ -291,8 +295,8 @@ void SSAFEM::cache_inputs(const StressBalanceInputs &inputs) {
         tau_d.u = (*inputs.driving_stress_x)(i, j);
         tau_d.v = (*inputs.driving_stress_y)(i, j);
       } else {
-	// tau_d above is set to zero by the Vector2
-	// constructor, but is not used
+        // tau_d above is set to zero by the Vector2
+        // constructor, but is not used
       }
 
       const double *enthalpy = inputs.ice_enthalpy->get_column(i, j);
@@ -303,7 +307,7 @@ void SSAFEM::cache_inputs(const StressBalanceInputs &inputs) {
       Coefficients c;
       c.thickness      = thickness;
       c.bed            = (*inputs.bed_elevation)(i, j);
-      c.sea_level      = m_sea_level; // FIXME: use a 2D field
+      c.sea_level      = inputs.sea_level; // FIXME: use a 2D field
       c.tauc           = (*inputs.basal_yield_stress)(i, j);
       c.hardness       = hardness;
       c.driving_stress = tau_d;
@@ -644,11 +648,11 @@ void SSAFEM::cache_residual_cfbc(const StressBalanceInputs &inputs) {
               H   = H_nodal[n0] * psi[0] + H_nodal[n1] * psi[1],
               bed = b_nodal[n0] * psi[0] + b_nodal[n1] * psi[1];
 
-            const bool floating = ocean(m_gc.mask(m_sea_level, bed, H));
+            const bool floating = ocean(m_gc.mask(inputs.sea_level, bed, H));
 
             // ocean pressure difference at a quadrature point
             const double dP = ocean_pressure_difference(floating, is_dry_simulation,
-                                                        H, bed, m_sea_level,
+                                                        H, bed, inputs.sea_level,
                                                         ice_density, ocean_density,
                                                         standard_gravity);
 
@@ -1238,6 +1242,11 @@ void SSAFEM_Inverse::init_impl() {
 
     // FIXME: we should use the real sea level
     inputs.sea_level = 0.0;
+
+    if (variables.is_available("vel_ssa_bc") and variables.is_available("bc_mask")) {
+      inputs.bc_values = variables.get_2d_vector("vel_ssa_bc");
+      inputs.bc_mask   = variables.get_2d_mask("bc_mask");
+    }
   }
   cache_inputs(inputs);
 }

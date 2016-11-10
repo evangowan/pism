@@ -47,6 +47,8 @@ StressBalanceInputs::StressBalanceInputs() {
   basal_melt_rate        = NULL;
   fracture_density       = NULL;
   cell_type              = NULL;
+  bc_mask                = NULL;
+  bc_values              = NULL;
 }
 
 StressBalance::StressBalance(IceGrid::ConstPtr g,
