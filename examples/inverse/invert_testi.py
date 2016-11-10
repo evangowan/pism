@@ -19,6 +19,9 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import PISM
+import PISM.invert.sipletools
+import PISM.invert.listener
+from PISM.invert.ssa import SSAForwardRun
 from PISM import util
 
 import numpy as np
@@ -94,8 +97,8 @@ class LinPlotListener(PISM.invert.listener.PlotListener):
             pp.ion()
             pp.show()
 
-Mx = 11
-My = 61
+Mx = 5
+My = 201
 
 kFEMStencilWidth = 1
 
@@ -115,7 +118,6 @@ right_side_weight = 1.
 tauc_guess_scale = 0.3
 tauc_guess_const = None
 
-
 def testi_tauc(grid, tauc):
     standard_gravity = grid.ctx().config().get_double("constants.standard_gravity")
     ice_density = grid.ctx().config().get_double("constants.ice.density")
@@ -127,9 +129,10 @@ def testi_tauc(grid, tauc):
             tauc[i, j] = f * (abs(y / L_schoof) ** m_schoof)
 
 
-class testi_run(PISM.invert.ssa.SSATaucForwardRun):
+class testi_run(SSAForwardRun):
 
     def __init__(self, Mx, My):
+        SSAForwardRun.__init__(self, "tauc")
         self.grid = None
         self.Mx = Mx
         self.My = My
@@ -141,7 +144,7 @@ class testi_run(PISM.invert.ssa.SSATaucForwardRun):
         Lx = max(60.0e3, ((Mx - 1) / 2.) * (2.0 * Ly / (My - 1)))
 
         ctx = PISM.Context().ctx
-        self.grid = PISM.IceGrid.Shallow(ctx, Lx, Ly, x0, y0, Mx, My, PISM.X_PERIODIC)
+        self.grid = PISM.IceGrid.Shallow(ctx, Lx, Ly, 0, 0, Mx, My, PISM.X_PERIODIC)
 
     def _initPhysics(self):
         config = self.config
@@ -158,20 +161,21 @@ class testi_run(PISM.invert.ssa.SSATaucForwardRun):
     def _initSSACoefficients(self):
         vecs = self.modeldata.vecs
         grid = self.grid
-        vecs.add(model.createIceThicknessVec(grid), 'thickness')
-        vecs.add(model.createBedrockElevationVec(grid), 'bed')
-        vecs.add(model.createYieldStressVec(grid), 'tauc')
-        vecs.add(model.createEnthalpyVec(grid), 'enthalpy')
-        vecs.add(model.createIceMaskVec(grid), 'ice_mask')
+        model = PISM.model
+        vecs.add(model.createIceThicknessVec(grid))
+        vecs.add(model.createBedrockElevationVec(grid))
+        vecs.add(model.createYieldStressVec(grid))
+        vecs.add(model.createEnthalpyVec(grid))
+        vecs.add(model.createIceMaskVec(grid))
         vecs.add(model.createDrivingStressXVec(grid))
         vecs.add(model.createDrivingStressYVec(grid))
         vecs.add(model.createVelocityMisfitWeightVec(grid))
 
         self._allocateBCs()
 
-        vecs.thickness.set(H0_schoof)
-        vecs.ice_mask.set(PISM.MASK_GROUNDED)
-        vecs.bed.set(0.)
+        vecs.thk.set(H0_schoof)
+        vecs.mask.set(PISM.MASK_GROUNDED)
+        vecs.topg.set(0.)
 
         testi_tauc(self.modeldata.grid, vecs.tauc)
 
@@ -183,12 +187,14 @@ class testi_run(PISM.invert.ssa.SSATaucForwardRun):
         vecs.ssa_driving_stress_y.set(0)
         vecs.ssa_driving_stress_x.set(f)
 
-        with PISM.vec.Access(comm=[vecs.bc_mask, vecs.vel_bc]):
+        bc_mask = vecs.bc_mask
+        bc_vel = vecs.vel_bc
+        with PISM.vec.Access(comm=[bc_mask, bc_vel]):
             for (i, j) in grid.points():
                 if (j == 0) or (j == grid.My() - 1):
-                    vecs.bc_mask[i, j] = 1
-                    vecs.vel_bc[i, j].u = 0
-                    vecs.vel_bc[i, j].v = 0
+                    bc_mask[i, j] = 1
+                    bc_vel[i, j].u = 0
+                    bc_vel[i, j].v = 0
 
         misfit_weight = vecs.vel_misfit_weight
         with PISM.vec.Access(comm=misfit_weight):
@@ -207,13 +213,23 @@ if __name__ == "__main__":
     Mx = PISM.optionsInt("-Mx", "Number of grid points in x-direction", default=Mx)
     My = PISM.optionsInt("-My", "Number of grid points in y-direction", default=My)
     output_file = PISM.optionsString("-o", "output file", default="invert_testi.nc")
-    right_side_weight = PISM.optionsReal("-right_side_weight", "L2 weight for y>0", default=right_side_weight)
-    tauc_guess_scale = PISM.optionsReal("-tauc_guess_scale", "initial guess for tauc to be this factor of the true value", default=tauc_guess_scale)
-    tauc_guess_const = PISM.optionsReal("-tauc_guess_const", "initial guess for tauc to be this constant", default=tauc_guess_const)
-    do_plotting = PISM.optionsFlag("-inv_plot", "perform visualization during the computation", default=False)
-    do_final_plot = PISM.optionsFlag("-inv_final_plot", "perform visualization at the end of the computation", default=True)
+    right_side_weight = PISM.optionsReal("-right_side_weight", "L2 weight for y>0",
+                                         default=right_side_weight)
+    tauc_guess_scale = PISM.optionsReal("-tauc_guess_scale",
+                                        "initial guess for tauc to be this factor of the true value",
+                                        default=tauc_guess_scale)
+    tauc_guess_const = PISM.optionsReal("-tauc_guess_const",
+                                        "initial guess for tauc to be this constant",
+                                        default=tauc_guess_const)
+    do_plotting = PISM.optionsFlag("-inv_plot",
+                                   "perform visualization during the computation",
+                                   default=False)
+    do_final_plot = PISM.optionsFlag("-inv_final_plot",
+                                     "perform visualization at the end of the computation",
+                                     default=True)
     do_pause = PISM.optionsFlag("-inv_pause", "pause each iteration", default=False)
-    test_adjoint = PISM.optionsFlag("-inv_test_adjoint", "Test that the adjoint is working", default=False)
+    test_adjoint = PISM.optionsFlag("-inv_test_adjoint",
+                                    "Test that the adjoint is working", default=False)
 
     inv_method = config.get_string("inverse.ssa.method")
 
@@ -267,7 +283,8 @@ if __name__ == "__main__":
 
     if test_adjoint:
         if solver.method.startswith('tikhonov'):
-            siple.reporting.msg("option -inv_test_adjoint cannot be used with inverse method %s", solver.method)
+            siple.reporting.msg("option -inv_test_adjoint cannot be used with inverse method %s",
+                                solver.method)
             exit(1)
         from PISM.invert.sipletools import PISMLocalVector as PLV
         stencil_width = 1
@@ -287,13 +304,14 @@ if __name__ == "__main__":
 
     # Send the true yeild stress through the forward problem to
     # get at true velocity field.
-    u_obs = PISM.model.create2dVelocityVec(grid, name='_ssa_true', desc='SSA velocity boundary condition', intent='intent')
+    u_obs = PISM.model.create2dVelocityVec(grid, name='_ssa_true',
+                                           desc='SSA velocity boundary condition', intent='intent')
     solver.solveForward(zeta_true, out=u_obs)
 
     # Attach various iteration listeners to the solver as needed for:
     # progress reporting,
     if inv_method.startswith('tikhonov'):
-        solver.addIterationListener(PISM.invert.ssa.PrintTikhonovProgress)
+        solver.addIterationListener(PISM.invert.ssa.printTikhonovProgress)
 
     # Plotting
     if do_plotting:
@@ -321,7 +339,7 @@ if __name__ == "__main__":
     testi.write(output_file)
     tauc.write(output_file)
     tauc_true.write(output_file)
-    u_i.set_name("_computed", 0)
+    u_i.set_name("_computed")
     u_i.write(output_file)
     u_obs.write(output_file)
 
@@ -342,12 +360,14 @@ if __name__ == "__main__":
         from matplotlib import pyplot
         pyplot.clf()
         pyplot.subplot(1, 2, 1)
-        pyplot.plot(y, tauc_a[:, Mx / 2])
-        pyplot.plot(y, tauc_true[:, Mx / 2])
+        pyplot.plot(y, tauc_a[Mx / 2, :], label="tauc_a")
+        pyplot.plot(y, tauc_true[Mx / 2, :], label="tauc_true")
+        pyplot.legend()
 
         pyplot.subplot(1, 2, 2)
-        pyplot.plot(y, u_i_a[0, :, Mx / 2] * secpera)
-        pyplot.plot(y, u_obs_a[0, :, Mx / 2] * secpera)
+        pyplot.plot(y, u_i_a[0, Mx / 2, :] * secpera, label="u")
+        pyplot.plot(y, u_obs_a[0, Mx / 2, :] * secpera, label="u_true")
+        pyplot.legend()
 
         pyplot.ion()
         pyplot.show()
