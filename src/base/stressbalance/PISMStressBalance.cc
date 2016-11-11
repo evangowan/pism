@@ -143,7 +143,7 @@ void StressBalance::update(bool fast, const StressBalanceInputs &inputs) {
 
     profiling.begin("SB modifier");
     const IceModelVec2V &velocity_2d = m_shallow_stress_balance->velocity();
-    m_modifier->update(velocity_2d, fast);
+    m_modifier->update(fast, inputs, velocity_2d);
     profiling.end("SB modifier");
 
     if (not fast) {

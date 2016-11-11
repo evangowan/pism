@@ -19,6 +19,7 @@
 #include "SIAFD_diagnostics.hh"
 #include "PISMBedSmoother.hh"
 #include "base/util/PISMVars.hh"
+#include "base/stressbalance/PISMStressBalance.hh"
 
 namespace pism {
 namespace stressbalance {
@@ -120,7 +121,12 @@ IceModelVec::Ptr SIAFD_diffusivity::compute_impl() {
   result->create(m_grid, "diffusivity", WITHOUT_GHOSTS);
   result->metadata() = m_vars[0];
 
-  model->compute_diffusivity(*result);
+  StressBalanceInputs inputs;
+  inputs.cell_type = m_grid->variables().get_2d_cell_type("mask");
+  inputs.ice_thickness = m_grid->variables().get_2d_scalar("land_ice_thickness");
+  inputs.surface_elevation = m_grid->variables().get_2d_scalar("surface_altitude");
+
+  model->compute_diffusivity(inputs, *result);
 
   return result;
 }
@@ -147,7 +153,12 @@ IceModelVec::Ptr SIAFD_diffusivity_staggered::compute_impl() {
   result->metadata(1) = m_vars[1];
   result->write_in_glaciological_units = true;
 
-  model->compute_diffusivity_staggered(*result);
+  StressBalanceInputs inputs;
+  inputs.cell_type = m_grid->variables().get_2d_cell_type("mask");
+  inputs.ice_thickness = m_grid->variables().get_2d_scalar("land_ice_thickness");
+  inputs.surface_elevation = m_grid->variables().get_2d_scalar("surface_altitude");
+
+  model->compute_diffusivity_staggered(inputs, *result);
 
   return result;
 }
@@ -175,7 +186,13 @@ IceModelVec::Ptr SIAFD_h_x::compute_impl() {
   result->metadata(1) = m_vars[1];
   result->write_in_glaciological_units = true;
 
-  model->compute_surface_gradient(model->m_work_2d_stag[0],
+  StressBalanceInputs inputs;
+  inputs.cell_type         = m_grid->variables().get_2d_cell_type("mask");
+  inputs.ice_thickness     = m_grid->variables().get_2d_scalar("land_ice_thickness");
+  inputs.surface_elevation = m_grid->variables().get_2d_scalar("surface_altitude");
+  inputs.bed_elevation     = m_grid->variables().get_2d_scalar("bedrock_altitude");
+  model->compute_surface_gradient(inputs,
+                                  model->m_work_2d_stag[0],
                                   model->m_work_2d_stag[1]);
 
   result->copy_from(model->m_work_2d_stag[0]);
@@ -206,7 +223,13 @@ IceModelVec::Ptr SIAFD_h_y::compute_impl() {
   result->metadata(1) = m_vars[1];
   result->write_in_glaciological_units = true;
 
-  model->compute_surface_gradient(model->m_work_2d_stag[0],
+  StressBalanceInputs inputs;
+  inputs.cell_type         = m_grid->variables().get_2d_cell_type("mask");
+  inputs.ice_thickness     = m_grid->variables().get_2d_scalar("land_ice_thickness");
+  inputs.surface_elevation = m_grid->variables().get_2d_scalar("surface_altitude");
+  inputs.bed_elevation     = m_grid->variables().get_2d_scalar("bedrock_altitude");
+  model->compute_surface_gradient(inputs,
+                                  model->m_work_2d_stag[0],
                                   model->m_work_2d_stag[1]);
 
   result->copy_from(model->m_work_2d_stag[1]);

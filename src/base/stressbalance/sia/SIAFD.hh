@@ -61,32 +61,41 @@ public:
 
   virtual void init();
 
-  virtual void update(const IceModelVec2V &vel_input, bool fast);
+  virtual void update(bool fast, const StressBalanceInputs &inputs,
+                      const IceModelVec2V &vel_input);
 
 protected:
   virtual void get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
                                     std::map<std::string, TSDiagnostic::Ptr> &ts_dict) const;
 
-  virtual void compute_surface_gradient(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
+  virtual void compute_surface_gradient(const StressBalanceInputs &inputs,
+                                        IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
 
-  virtual void surface_gradient_eta(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
-  virtual void surface_gradient_haseloff(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
-  virtual void surface_gradient_mahaffy(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
+  virtual void surface_gradient_eta(const StressBalanceInputs &inputs,
+                                    IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
+  virtual void surface_gradient_haseloff(const StressBalanceInputs &inputs,
+                                         IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
+  virtual void surface_gradient_mahaffy(const StressBalanceInputs &inputs,
+                                        IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;
 
-  virtual void compute_diffusive_flux(const IceModelVec2Stag &h_x, const IceModelVec2Stag &h_y,
+  virtual void compute_diffusive_flux(const StressBalanceInputs &inputs,
+                                      const IceModelVec2Stag &h_x, const IceModelVec2Stag &h_y,
                                       IceModelVec2Stag &result, bool fast);
 
-  virtual void compute_3d_horizontal_velocity(const IceModelVec2Stag &h_x,
+  virtual void compute_3d_horizontal_velocity(const StressBalanceInputs &inputs,
+                                              const IceModelVec2Stag &h_x,
                                               const IceModelVec2Stag &h_y,
                                               const IceModelVec2V &vel_input,
                                               IceModelVec3 &u_out, IceModelVec3 &v_out);
 
-  virtual void compute_I();
+  virtual void compute_I(const StressBalanceInputs &inputs);
 
   virtual double grainSizeVostok(double age) const;
 
-  virtual void compute_diffusivity(IceModelVec2S &result) const;
-  virtual void compute_diffusivity_staggered(IceModelVec2Stag &result) const;
+  virtual void compute_diffusivity(const StressBalanceInputs &inputs,
+                                   IceModelVec2S &result) const;
+  virtual void compute_diffusivity_staggered(const StressBalanceInputs &inputs,
+                                             IceModelVec2Stag &result) const;
 
   bool interglacial(double accumulation_time);
 

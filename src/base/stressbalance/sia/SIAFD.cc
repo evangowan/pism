@@ -29,6 +29,7 @@
 #include "base/util/pism_const.hh"
 #include "base/util/Profiling.hh"
 #include "base/util/IceModelVec2CellType.hh"
+#include "base/stressbalance/PISMStressBalance.hh"
 
 #include "base/util/PISMTime.hh"
 #include "base/util/pism_utilities.hh"
@@ -142,10 +143,11 @@ void SIAFD::init() {
 
 //! \brief Do the update; if fast == true, skip the update of 3D velocities and
 //! strain heating.
-void SIAFD::update(const IceModelVec2V &vel_input, bool fast) {
+void SIAFD::update(bool fast, const StressBalanceInputs &inputs,
+                   const IceModelVec2V &vel_input) {
   IceModelVec2Stag &h_x = m_work_2d_stag[0], &h_y = m_work_2d_stag[1];
 
-  const IceModelVec2S *bed = m_grid->variables().get_2d_scalar("bedrock_altitude");
+  const IceModelVec2S *bed = inputs.bed_elevation;
 
   const Profiling &profiling = m_grid->ctx()->profiling();
 
@@ -159,16 +161,16 @@ void SIAFD::update(const IceModelVec2V &vel_input, bool fast) {
   }
 
   profiling.begin("SIA gradient");
-  compute_surface_gradient(h_x, h_y);
+  compute_surface_gradient(inputs, h_x, h_y);
   profiling.end("SIA gradient");
 
   profiling.begin("SIA flux");
-  compute_diffusive_flux(h_x, h_y, m_diffusive_flux, fast);
+  compute_diffusive_flux(inputs, h_x, h_y, m_diffusive_flux, fast);
   profiling.end("SIA flux");
 
   if (!fast) {
     profiling.begin("SIA 3D hor. vel.");
-    compute_3d_horizontal_velocity(h_x, h_y, vel_input, m_u, m_v);
+    compute_3d_horizontal_velocity(inputs, h_x, h_y, vel_input, m_u, m_v);
     profiling.end("SIA 3D hor. vel.");
   }
 }
@@ -210,21 +212,22 @@ void SIAFD::update(const IceModelVec2V &vel_input, bool fast) {
   \param[out] h_x the X-component of the surface gradient, on the staggered grid
   \param[out] h_y the Y-component of the surface gradient, on the staggered grid
 */
-void SIAFD::compute_surface_gradient(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
+void SIAFD::compute_surface_gradient(const StressBalanceInputs &inputs,
+                                     IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
 
   const std::string method = m_config->get_string("stress_balance.sia.surface_gradient_method");
 
   if (method == "eta") {
 
-    surface_gradient_eta(h_x, h_y);
+    surface_gradient_eta(inputs, h_x, h_y);
 
   } else if (method == "haseloff") {
 
-    surface_gradient_haseloff(h_x, h_y);
+    surface_gradient_haseloff(inputs, h_x, h_y);
 
   } else if (method == "mahaffy") {
 
-    surface_gradient_mahaffy(h_x, h_y);
+    surface_gradient_mahaffy(inputs, h_x, h_y);
 
   } else {
     throw RuntimeError::formatted(PISM_ERROR_LOCATION, "value of sia.surface_gradient_method, option '-gradient %s', is not valid",
@@ -233,7 +236,8 @@ void SIAFD::compute_surface_gradient(IceModelVec2Stag &h_x, IceModelVec2Stag &h_
 }
 
 //! \brief Compute the ice surface gradient using the eta-transformation.
-void SIAFD::surface_gradient_eta(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
+void SIAFD::surface_gradient_eta(const StressBalanceInputs &inputs,
+                                 IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
   const double n = m_flow_law->exponent(), // presumably 3.0
     etapow  = (2.0 * n + 2.0)/n,  // = 8/3 if n = 3
     invpow  = 1.0 / etapow,
@@ -244,8 +248,8 @@ void SIAFD::surface_gradient_eta(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) c
   // compute eta = H^{8/3}, which is more regular, on reg grid
 
   const IceModelVec2S
-    &H = *m_grid->variables().get_2d_scalar("land_ice_thickness"),
-    &b = *m_grid->variables().get_2d_scalar("bedrock_altitude");
+    &H = *inputs.ice_thickness,
+    &b = *inputs.bed_elevation;
 
   IceModelVec::AccessList list(eta);
   list.add(H);
@@ -312,10 +316,11 @@ void SIAFD::surface_gradient_eta(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) c
 
 //! \brief Compute the ice surface gradient using the Mary Anne Mahaffy method;
 //! see [\ref Mahaffy].
-void SIAFD::surface_gradient_mahaffy(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
+void SIAFD::surface_gradient_mahaffy(const StressBalanceInputs &inputs,
+                                     IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
   const double dx = m_grid->dx(), dy = m_grid->dy();  // convenience
 
-  const IceModelVec2S &h = *m_grid->variables().get_2d_scalar("surface_altitude");
+  const IceModelVec2S &h = *inputs.surface_elevation;
 
   IceModelVec::AccessList list;
   list.add(h_x);
@@ -389,18 +394,19 @@ void SIAFD::surface_gradient_mahaffy(IceModelVec2Stag &h_x, IceModelVec2Stag &h_
  * words, a purely local computation would require width=3 stencil of surface,
  * mask, and bed fields.)
  */
-void SIAFD::surface_gradient_haseloff(IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
+void SIAFD::surface_gradient_haseloff(const StressBalanceInputs &inputs,
+                                      IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const {
   const double
     dx = m_grid->dx(),
     dy = m_grid->dy();  // convenience
   const IceModelVec2S
-    &h = *m_grid->variables().get_2d_scalar("surface_altitude"),
-    &b = *m_grid->variables().get_2d_scalar("bedrock_altitude");
+    &h = *inputs.surface_elevation,
+    &b = *inputs.bed_elevation;
   IceModelVec2S
     &w_i = m_work_2d[0],
     &w_j = m_work_2d[1]; // averaging weights
 
-  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
+  const IceModelVec2CellType &mask = *inputs.cell_type;
 
   IceModelVec::AccessList list;
   list.add(h_x);
@@ -567,17 +573,18 @@ void SIAFD::surface_gradient_haseloff(IceModelVec2Stag &h_x, IceModelVec2Stag &h
  * \param[out] result diffusive ice flux
  * \param[in]  fast the boolean flag specitying if we're doing a "fast" update.
  */
-void SIAFD::compute_diffusive_flux(const IceModelVec2Stag &h_x, const IceModelVec2Stag &h_y,
+void SIAFD::compute_diffusive_flux(const StressBalanceInputs &inputs,
+                                   const IceModelVec2Stag &h_x, const IceModelVec2Stag &h_y,
                                    IceModelVec2Stag &result, bool fast) {
   IceModelVec2S
     &thk_smooth = m_work_2d[0],
     &theta      = m_work_2d[1];
 
   const IceModelVec2S
-    &h = *m_grid->variables().get_2d_scalar("surface_altitude"),
-    &H = *m_grid->variables().get_2d_scalar("land_ice_thickness");
+    &h = *inputs.surface_elevation,
+    &H = *inputs.ice_thickness;
 
-  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
+  const IceModelVec2CellType &mask = *inputs.cell_type;
 
   bool full_update = (not fast);
 
@@ -792,10 +799,11 @@ void SIAFD::compute_diffusive_flux(const IceModelVec2Stag &h_x, const IceModelVe
  * \f$\delta\f$.
  * \param[out] result The diffusivity of the SIA flow.
  */
-void SIAFD::compute_diffusivity(IceModelVec2S &result) const {
+void SIAFD::compute_diffusivity(const StressBalanceInputs &inputs,
+                                IceModelVec2S &result) const {
   IceModelVec2Stag &D_stag = m_work_2d_stag[0];
 
-  this->compute_diffusivity_staggered(D_stag);
+  this->compute_diffusivity_staggered(inputs, D_stag);
 
   D_stag.update_ghosts();
 
@@ -806,13 +814,14 @@ void SIAFD::compute_diffusivity(IceModelVec2S &result) const {
  * \brief Computes the diffusivity of the SIA mass continuity equation on the
  * staggered grid (for debugging).
  */
-void SIAFD::compute_diffusivity_staggered(IceModelVec2Stag &D_stag) const {
+void SIAFD::compute_diffusivity_staggered(const StressBalanceInputs &inputs,
+                                          IceModelVec2Stag &D_stag) const {
 
   const IceModelVec2S
-    &h = *m_grid->variables().get_2d_scalar("surface_altitude"),
-    &H = *m_grid->variables().get_2d_scalar("land_ice_thickness");
+    &h = *inputs.surface_elevation,
+    &H = *inputs.ice_thickness;
 
-  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
+  const IceModelVec2CellType &mask = *inputs.cell_type;
 
   IceModelVec2S &thk_smooth = m_work_2d[0];
   m_bed_smoother->get_smoothed_thk(h, H, mask, thk_smooth);
@@ -878,16 +887,16 @@ void SIAFD::compute_diffusivity_staggered(IceModelVec2Stag &D_stag) const {
  * The result is stored in work_3d[0,1] and is used to compute the SIA component
  * of the 3D-distributed horizontal ice velocity.
  */
-void SIAFD::compute_I() {
+void SIAFD::compute_I(const StressBalanceInputs &inputs) {
 
   IceModelVec2S &thk_smooth = m_work_2d[0];
   IceModelVec3* I = m_work_3d;
 
   const IceModelVec2S
-    &h = *m_grid->variables().get_2d_scalar("surface_altitude"),
-    &H = *m_grid->variables().get_2d_scalar("land_ice_thickness");
+    &h = *inputs.surface_elevation,
+    &H = *inputs.ice_thickness;
 
-  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
+  const IceModelVec2CellType &mask = *inputs.cell_type;
 
   m_bed_smoother->get_smoothed_thk(h, H, mask, thk_smooth);
 
@@ -965,11 +974,12 @@ void SIAFD::compute_I() {
  * \param[out] u_out the X-component of the resulting horizontal velocity field
  * \param[out] v_out the Y-component of the resulting horizontal velocity field
  */
-void SIAFD::compute_3d_horizontal_velocity(const IceModelVec2Stag &h_x, const IceModelVec2Stag &h_y,
+void SIAFD::compute_3d_horizontal_velocity(const StressBalanceInputs &inputs,
+                                           const IceModelVec2Stag &h_x, const IceModelVec2Stag &h_y,
                                            const IceModelVec2V &vel_input,
                                            IceModelVec3 &u_out, IceModelVec3 &v_out) {
 
-  compute_I();
+  compute_I(inputs);
   // after the compute_I() call work_3d[0,1] contains I on the staggered grid
   IceModelVec3 *I = m_work_3d;
 

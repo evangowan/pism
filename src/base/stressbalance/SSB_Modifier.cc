@@ -122,7 +122,10 @@ ConstantInColumn::~ConstantInColumn()
  * - maximum diffusivity
  * - strain heating (strain_heating)
  */
-void ConstantInColumn::update(const IceModelVec2V &vel_input, bool fast) {
+void ConstantInColumn::update(bool fast, const StressBalanceInputs &inputs,
+                              const IceModelVec2V &vel_input) {
+
+  (void) inputs;
 
   if (fast) {
     return;

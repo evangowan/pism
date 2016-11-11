@@ -33,6 +33,8 @@ class FlowLaw;
 
 namespace stressbalance {
 
+class StressBalanceInputs;
+
 //! Shallow stress balance modifier (such as the non-sliding SIA).
 class SSB_Modifier : public Component {
 public:
@@ -41,7 +43,8 @@ public:
 
   virtual void init();
 
-  virtual void update(const IceModelVec2V &vel_input, bool fast) = 0;
+  virtual void update(bool fast, const StressBalanceInputs &inputs,
+                      const IceModelVec2V &vel_input) = 0;
 
   //! \brief Get the diffusive (SIA) vertically-averaged flux on the staggered grid.
   virtual const IceModelVec2Stag& diffusive_flux();
@@ -75,7 +78,8 @@ public:
 
   virtual void init();
 
-  virtual void update(const IceModelVec2V &vel_input, bool fast);
+  virtual void update(bool fast, const StressBalanceInputs &inputs,
+                      const IceModelVec2V &vel_input);
 
 protected:
 };
