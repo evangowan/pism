@@ -33,6 +33,9 @@ namespace stressbalance {
 class StressBalanceInputs {
 public:
   StressBalanceInputs();
+
+  void check(const Config &config) const;
+
   double sea_level;
 
   // geometry

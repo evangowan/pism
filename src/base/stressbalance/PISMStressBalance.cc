@@ -51,6 +51,52 @@ StressBalanceInputs::StressBalanceInputs() {
   bc_values              = NULL;
 }
 
+static void check_input(const IceModelVec *ptr, const char *name) {
+  if (ptr == NULL) {
+    throw RuntimeError::formatted(PISM_ERROR_LOCATION,
+                                  "stress balance input %s was not provided", name);
+  }
+}
+
+void StressBalanceInputs::check(const Config &config) const {
+  // FIXME: check sea level once it is a 2D field
+
+  check_input(ice_thickness, "ice_thickness");
+  check_input(bed_elevation, "bed_elevation");
+  check_input(cell_type, "cell_type");
+
+  check_input(basal_melt_rate, "basal_melt_rate");
+
+  if (surface_elevation == NULL) {
+    if (driving_stress_x == NULL or driving_stress_y == NULL) {
+      throw RuntimeError::formatted(PISM_ERROR_LOCATION,
+                                    "have to provide surface_elevation "
+                                    "or the pair driving_stress_{x,y}");
+    }
+  }
+
+  check_input(ice_enthalpy, "ice_enthalpy");
+
+  check_input(melange_back_pressure, "melange_back_pressure");
+
+  if (config.get_boolean("stress_balance.ssa.dirichlet_bc")) {
+    check_input(bc_mask, "bc_mask");
+    check_input(bc_values, "bc_values");
+  }
+
+  check_input(basal_yield_stress, "basal_yield_stress");
+
+  if (config.get_boolean("geometry.grounded_cell_fraction") and
+      config.get_string("stress_balance.ssa.method") == "fd") {
+    // Note: only SSAFD uses grounded_cell_fraction
+    check_input(grounded_cell_fraction, "grounded_cell_fraction");
+  }
+
+  if (config.get_boolean("fracture_density.enabled")) {
+    check_input(fracture_density, "fracture_density");
+  }
+}
+
 StressBalance::StressBalance(IceGrid::ConstPtr g,
                              ShallowStressBalance *sb,
                              SSB_Modifier *ssb_mod)
@@ -84,6 +130,9 @@ void StressBalance::init() {
 
 //! \brief Performs the shallow stress balance computation.
 void StressBalance::update(bool fast, const StressBalanceInputs &inputs) {
+
+  // check if all the required inputs were provided
+  inputs.check(*m_config);
 
   const Profiling &profiling = m_grid->ctx()->profiling();
 
