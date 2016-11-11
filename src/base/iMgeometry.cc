@@ -74,7 +74,13 @@ void IceModel::enforce_consistency_of_geometry() {
 
     gc.compute_mask(sea_level, bed_topography, m_ice_thickness, m_cell_type);
 
-    m_iceberg_remover->update(m_cell_type, m_ice_thickness);
+    if (m_config->get_boolean("stress_balance.ssa.dirichlet_bc")) {
+      m_iceberg_remover->update(&m_ssa_dirichlet_bc_mask,
+                                m_cell_type, m_ice_thickness);
+    } else {
+      m_iceberg_remover->update(NULL, m_cell_type, m_ice_thickness);
+    }
+
     // the call above modifies ice thickness and updates the mask accordingly, but we re-compute the
     // mask (we need to use the different threshold)
   }

@@ -99,6 +99,7 @@ void IceRegionalModel::createVecs() {
   m_grid->variables().add(m_thk_stored);
 
   if (m_config->get_boolean("stress_balance.ssa.dirichlet_bc")) {
+    // FIXME: this does not work any more
     // remove the bc_mask variable from the dictionary
     m_grid->variables().remove("bc_mask");
 

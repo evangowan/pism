@@ -53,7 +53,8 @@ public:
   virtual ~IcebergRemover();
 
   virtual void init();
-  void update(IceModelVec2CellType &pism_mask, IceModelVec2S &ice_thickness);
+  void update(const IceModelVec2Int *bc_mask,
+              IceModelVec2CellType &pism_mask, IceModelVec2S &ice_thickness);
 protected:
   IceModelVec2S m_iceberg_mask;
   petsc::Vec::Ptr m_mask_p0;

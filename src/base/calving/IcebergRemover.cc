@@ -48,7 +48,8 @@ void IcebergRemover::init() {
  * @param[in,out] pism_mask PISM's ice cover mask
  * @param[in,out] ice_thickness ice thickness
  */
-void IcebergRemover::update(IceModelVec2CellType &mask,
+void IcebergRemover::update(const IceModelVec2Int *bc_mask,
+                            IceModelVec2CellType &mask,
                             IceModelVec2S &ice_thickness) {
   const int
     mask_grounded_ice = 1,
@@ -75,14 +76,13 @@ void IcebergRemover::update(IceModelVec2CellType &mask,
 
     // Mark icy SSA Dirichlet B.C. cells as "grounded" because we
     // don't want them removed.
-    if (m_grid->variables().is_available("bc_mask")) {
-      const IceModelVec2Int &bc_mask = *m_grid->variables().get_2d_mask("bc_mask");
-      list.add(bc_mask);
+    if (bc_mask != NULL) {
+      list.add(*bc_mask);
 
       for (Points p(*m_grid); p; p.next()) {
         const int i = p.i(), j = p.j();
 
-        if (bc_mask(i,j) > 0.5 and mask.icy(i,j)) {
+        if ((*bc_mask)(i,j) > 0.5 and mask.icy(i,j)) {
           m_iceberg_mask(i,j) = mask_grounded_ice;
         }
       }
@@ -115,18 +115,17 @@ void IcebergRemover::update(IceModelVec2CellType &mask,
     list.add(mask);
     list.add(m_iceberg_mask);
 
-    if (m_grid->variables().is_available("bc_mask")) {
-      const IceModelVec2Int &bc_mask = *m_grid->variables().get_2d_mask("bc_mask");
+    if (bc_mask != NULL) {
       // if SSA Dirichlet B.C. are in use, do not modify mask and ice
       // thickness at Dirichlet B.C. locations
-      list.add(bc_mask);
+      list.add(*bc_mask);
 
       for (Points p(*m_grid); p; p.next()) {
         const int i = p.i(), j = p.j();
 
-        if (m_iceberg_mask(i,j) > 0.5 && bc_mask(i,j) < 0.5) {
+        if (m_iceberg_mask(i,j) > 0.5 && (*bc_mask)(i,j) < 0.5) {
           ice_thickness(i,j) = 0.0;
-          mask(i,j)     = MASK_ICE_FREE_OCEAN;
+          mask(i,j)          = MASK_ICE_FREE_OCEAN;
         }
       }
     } else {
@@ -136,7 +135,7 @@ void IcebergRemover::update(IceModelVec2CellType &mask,
 
         if (m_iceberg_mask(i,j) > 0.5) {
           ice_thickness(i,j) = 0.0;
-          mask(i,j)     = MASK_ICE_FREE_OCEAN;
+          mask(i,j)          = MASK_ICE_FREE_OCEAN;
         }
       }
     }
