@@ -49,7 +49,7 @@ static char help[] =
 namespace pism {
 
 static void compute_strain_heating_errors(const IceModelVec3 &strain_heating,
-                                          const IceModelVec2S &thickness,
+                                          const IceModelVec2S &ice_thickness,
                                           const IceGrid &grid,
                                           double &gmax_strain_heating_err,
                                           double &gav_strain_heating_err) {
@@ -63,7 +63,7 @@ static void compute_strain_heating_errors(const IceModelVec3 &strain_heating,
     ice_c     = grid.ctx()->config()->get_double("constants.ice.specific_heat_capacity");
 
   IceModelVec::AccessList list;
-  list.add(thickness);
+  list.add(ice_thickness);
   list.add(strain_heating);
 
   ParallelSection loop(grid.com);
@@ -84,7 +84,7 @@ static void compute_strain_heating_errors(const IceModelVec3 &strain_heating,
         for (int k = 0; k < Mz; k++) {
           F.Sig[k] *= ice_rho * ice_c; // scale exact strain_heating to J/(s m^3)
         }
-        const int ks = grid.kBelowHeight(thickness(i, j));
+        const int ks = grid.kBelowHeight(ice_thickness(i, j));
         const double *strain_heating_ij = strain_heating.get_column(i, j);
         for (int k = 0; k < ks; k++) {  // only eval error if below num surface
           const double _strain_heating_error = fabs(strain_heating_ij[k] - F.Sig[k]);
@@ -160,30 +160,30 @@ static void computeSurfaceVelocityErrors(const IceGrid &grid,
 
 static void enthalpy_from_temperature_cold(EnthalpyConverter &EC,
                                            const IceGrid &grid,
-                                           const IceModelVec2S &thickness,
+                                           const IceModelVec2S &ice_thickness,
                                            const IceModelVec3 &temperature,
-                                           IceModelVec3 &enthalpy) {
+                                           IceModelVec3 &ice_enthalpy) {
 
   IceModelVec::AccessList list;
   list.add(temperature);
-  list.add(enthalpy);
-  list.add(thickness);
+  list.add(ice_enthalpy);
+  list.add(ice_thickness);
 
   for (Points p(grid); p; p.next()) {
     const int i = p.i(), j = p.j();
 
     const double *T_ij = temperature.get_column(i,j);
-    double *E_ij = enthalpy.get_column(i,j);
+    double *E_ij = ice_enthalpy.get_column(i,j);
 
     for (unsigned int k=0; k<grid.Mz(); ++k) {
-      double depth = thickness(i,j) - grid.z(k);
+      double depth = ice_thickness(i,j) - grid.z(k);
       E_ij[k] = EC.enthalpy_permissive(T_ij[k], 0.0,
                                      EC.pressure(depth));
     }
 
   }
 
-  enthalpy.update_ghosts();
+  ice_enthalpy.update_ghosts();
 }
 
 
@@ -193,8 +193,8 @@ static void setInitStateF(IceGrid &grid,
                           IceModelVec2S &bed,
                           IceModelVec2Int &mask,
                           IceModelVec2S &surface,
-                          IceModelVec2S &thickness,
-                          IceModelVec3 &enthalpy) {
+                          IceModelVec2S &ice_thickness,
+                          IceModelVec3 &ice_enthalpy) {
 
   double
     ST     = 1.67e-5,
@@ -205,8 +205,8 @@ static void setInitStateF(IceGrid &grid,
   mask.set(MASK_GROUNDED);
 
   IceModelVec::AccessList list;
-  list.add(thickness);
-  list.add(enthalpy);
+  list.add(ice_thickness);
+  list.add(ice_enthalpy);
 
   for (Points p(grid); p; p.next()) {
     const int i = p.i(), j = p.j();
@@ -216,28 +216,28 @@ static void setInitStateF(IceGrid &grid,
       Ts = Tmin + ST * r;
 
     if (r > LforFG - 1.0) { // if (essentially) outside of sheet
-      thickness(i, j) = 0.0;
-      enthalpy.set_column(i, j, Ts);
+      ice_thickness(i, j) = 0.0;
+      ice_enthalpy.set_column(i, j, Ts);
     } else {
       TestFGParameters F = exactFG(0.0, r, grid.z(), 0.0);
 
-      thickness(i, j) = F.H;
-      enthalpy.set_column(i, j, &F.T[0]);
+      ice_thickness(i, j) = F.H;
+      ice_enthalpy.set_column(i, j, &F.T[0]);
     }
   }
 
 
-  thickness.update_ghosts();
+  ice_thickness.update_ghosts();
 
-  surface.copy_from(thickness);
+  surface.copy_from(ice_thickness);
 
-  enthalpy_from_temperature_cold(EC, grid, thickness, enthalpy,
-                                 enthalpy);
+  enthalpy_from_temperature_cold(EC, grid, ice_thickness, ice_enthalpy,
+                                 ice_enthalpy);
 }
 
 static void reportErrors(const IceGrid &grid,
                          units::System::Ptr unit_system,
-                         const IceModelVec2S &thickness,
+                         const IceModelVec2S &ice_thickness,
                          const IceModelVec3 &u_sia,
                          const IceModelVec3 &v_sia,
                          const IceModelVec3 &w_sia,
@@ -247,7 +247,7 @@ static void reportErrors(const IceGrid &grid,
 
   // strain_heating errors if appropriate; reported in 10^6 J/(s m^3)
   double max_strain_heating_error, av_strain_heating_error;
-  compute_strain_heating_errors(strain_heating, thickness,
+  compute_strain_heating_errors(strain_heating, ice_thickness,
                                 grid,
                                 max_strain_heating_error, av_strain_heating_error);
 
@@ -258,20 +258,20 @@ static void reportErrors(const IceGrid &grid,
 
   // surface velocity errors if exact values are available; reported in m year-1
   double maxUerr, avUerr, maxWerr, avWerr;
-  computeSurfaceVelocityErrors(grid, thickness,
+  computeSurfaceVelocityErrors(grid, ice_thickness,
                                u_sia,
                                v_sia,
                                w_sia,
                                maxUerr, avUerr,
                                maxWerr, avWerr);
 
+  units::Converter m_per_year(unit_system, "m second-1", "m year-1");
+
   log->message(1,
                "surf vels :     maxUvec      avUvec        maxW         avW\n");
   log->message(1, "           %12.6f%12.6f%12.6f%12.6f\n",
-               units::convert(unit_system, maxUerr, "m second-1", "m year-1"),
-               units::convert(unit_system, avUerr,  "m second-1", "m year-1"),
-               units::convert(unit_system, maxWerr, "m second-1", "m year-1"),
-               units::convert(unit_system, avWerr,  "m second-1", "m year-1"));
+               m_per_year(maxUerr), m_per_year(avUerr),
+               m_per_year(maxWerr), m_per_year(avWerr));
 }
 
 } // end of namespace pism
@@ -330,8 +330,8 @@ int main(int argc, char *argv[]) {
 
     IceModelVec2S ice_surface_elevation, ice_thickness, bed_topography;
     IceModelVec2CellType cell_type;
-    IceModelVec3 enthalpy,
-      age;                      // is not used (and need not be allocated)
+    IceModelVec3 ice_enthalpy,
+      ice_age;                      // is not used (and need not be allocated)
     const int WIDE_STENCIL = config->get_double("grid.max_stencil_width");
 
     Vars &vars = grid->variables();
@@ -355,18 +355,18 @@ int main(int argc, char *argv[]) {
     vars.add(ice_thickness);
 
     // age of the ice; is not used here
-    age.create(grid, "age", WITHOUT_GHOSTS);
-    age.set_attrs("diagnostic", "age of the ice", "s", "");
-    age.metadata().set_string("glaciological_units", "year");
-    age.write_in_glaciological_units = true;
-    vars.add(age);
+    ice_age.create(grid, "age", WITHOUT_GHOSTS);
+    ice_age.set_attrs("diagnostic", "age of the ice", "s", "");
+    ice_age.metadata().set_string("glaciological_units", "year");
+    ice_age.write_in_glaciological_units = true;
+    vars.add(ice_age);
 
     // enthalpy in the ice
-    enthalpy.create(grid, "enthalpy", WITH_GHOSTS, WIDE_STENCIL);
-    enthalpy.set_attrs("model_state",
+    ice_enthalpy.create(grid, "enthalpy", WITH_GHOSTS, WIDE_STENCIL);
+    ice_enthalpy.set_attrs("model_state",
                        "ice enthalpy (includes sensible heat, latent heat, pressure)",
                        "J kg-1", "");
-    vars.add(enthalpy);
+    vars.add(ice_enthalpy);
 
     // grounded_dragging_floating integer mask
     cell_type.create(grid, "mask", WITH_GHOSTS, WIDE_STENCIL);
@@ -395,21 +395,36 @@ int main(int argc, char *argv[]) {
     // fill the fields:
     setInitStateF(*grid, *EC,
                   bed_topography, cell_type, ice_surface_elevation, ice_thickness,
-                  enthalpy);
+                  ice_enthalpy);
 
     // Allocate the SIA solver:
     stress_balance.init();
 
-    IceModelVec2S melange_back_pressure;
-    melange_back_pressure.create(grid, "melange_back_pressure", WITHOUT_GHOSTS);
-    melange_back_pressure.set_attrs("boundary_condition",
-                                    "melange back pressure fraction", "", "");
-    melange_back_pressure.set(0.0);
+    IceModelVec2S basal_melt_rate;
+    basal_melt_rate.create(grid, "basal_melt_rate", WITHOUT_GHOSTS);
+    basal_melt_rate.set_attrs("internal", "basal melt rate", "m second-1", "");
+    basal_melt_rate.set(0.0);
+
+    IceModelVec2S dummy;
+    dummy.create(grid, "dummy", WITHOUT_GHOSTS);
+    dummy.set_attrs("internal", "dummy", "", "");
+    dummy.set(0.0);
 
     // Solve (fast==true means "no 3D update and no strain heating computation"):
     bool fast = false;
     StressBalanceInputs inputs;
-    // FIXME: this will segfault
+    {
+      inputs.ice_thickness      = &ice_thickness;
+      inputs.bed_elevation      = &bed_topography;
+      inputs.surface_elevation  = &ice_surface_elevation;
+      inputs.cell_type          = &cell_type;
+      inputs.ice_enthalpy       = &ice_enthalpy;
+      inputs.basal_melt_rate    = &basal_melt_rate;
+      inputs.basal_yield_stress = &dummy;
+
+      inputs.melange_back_pressure = &dummy;
+      inputs.sea_level             = 0.0;
+    }
     stress_balance.update(fast, inputs);
 
     // Report errors relative to the exact solution:
