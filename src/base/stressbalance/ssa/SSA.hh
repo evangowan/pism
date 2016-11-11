@@ -120,6 +120,8 @@ public:
 
   virtual void compute_driving_stress(const StressBalanceInputs &inputs, IceModelVec2V &result) const;
 
+  double ocean_pressure_difference(bool shelf, bool dry_mode, double H, double bed, double sea_level,
+                                   double rho_ice, double rho_ocean, double g) const;
 protected:
   virtual void define_model_state_impl(const PIO &output) const;
   virtual void write_model_state_impl(const PIO &output) const;
@@ -130,9 +132,6 @@ protected:
                                     std::map<std::string, TSDiagnostic::Ptr> &ts_dict) const;
 
   virtual void solve(const StressBalanceInputs &inputs) = 0;
-
-  double ocean_pressure_difference(bool shelf, bool dry_mode, double H, double bed, double sea_level,
-                                   double rho_ice, double rho_ocean, double g);
 
   IceModelVec2CellType m_mask;
   IceModelVec2V m_taud;

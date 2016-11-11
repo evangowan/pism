@@ -309,12 +309,6 @@ protected:
     IceModelVec2S discharge;
   };
 
-public:
-  FluxCounters cumulative_fluxes() const;
-  const IceModelVec2S& flux_divergence() const;
-  const FluxFields& cumulative_fluxes_2d() const;
-  double dt() const;
-
 protected:
   FluxCounters m_cumulative_fluxes;
   FluxFields m_cumulative_flux_fields;
@@ -381,8 +375,6 @@ protected:
                                 double meltfrac, double max_diffusivity);
 
 public:
-  const IceModelVec2S &cell_area() const;
-  const IceModelVec2CellType &cell_type_mask() const;
 
   // see iMreport.cc;  methods for computing diagnostic quantities:
   // scalar:
@@ -420,6 +412,15 @@ public:
   const energy::EnergyModel* energy_balance_model() const;
 
   const IceModelVec2S& ice_thickness() const;
+  const IceModelVec2S& ice_surface_elevation() const;
+  const IceModelVec2CellType& cell_type() const;
+  const IceModelVec2S &cell_area() const;
+
+  FluxCounters cumulative_fluxes() const;
+  const IceModelVec2S& flux_divergence() const;
+  const FluxFields& cumulative_fluxes_2d() const;
+  double dt() const;
+
 protected:
 
   std::map<std::string,Diagnostic::Ptr> m_diagnostics;

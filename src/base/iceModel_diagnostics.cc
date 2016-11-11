@@ -280,7 +280,7 @@ IceModelVec::Ptr IceModel_hardav::compute_impl() {
   result->create(m_grid, "hardav", WITHOUT_GHOSTS);
   result->metadata() = m_vars[0];
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   const IceModelVec3& ice_enthalpy = model->energy_balance_model()->enthalpy();
   const IceModelVec2S& ice_thickness = model->ice_thickness();
@@ -376,7 +376,7 @@ IceModel_proc_ice_area::IceModel_proc_ice_area(const IceModel *m)
 IceModelVec::Ptr IceModel_proc_ice_area::compute_impl() {
 
   const IceModelVec2S        &thickness = *m_grid->variables().get_2d_scalar("land_ice_thickness");
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   IceModelVec2S::Ptr result(new IceModelVec2S);
   result->create(m_grid, "proc_ice_area", WITHOUT_GHOSTS);
@@ -673,7 +673,7 @@ IceModelVec::Ptr IceModel_tempbase::compute_impl() {
   // result contains basal enthalpy; note that it is allocated by
   // IceModel_enthalpybase::compute().
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   IceModelVec::AccessList list;
   list.add(cell_type);
@@ -802,7 +802,7 @@ IceModelVec::Ptr IceModel_tempicethk::compute_impl() {
   result->create(m_grid, "tempicethk", WITHOUT_GHOSTS);
   result->metadata(0) = m_vars[0];
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
   const IceModelVec3& ice_enthalpy = model->energy_balance_model()->enthalpy();
   const IceModelVec2S& ice_thickness = model->ice_thickness();
 
@@ -875,7 +875,7 @@ IceModelVec::Ptr IceModel_tempicethk_basal::compute_impl() {
 
   EnthalpyConverter::Ptr EC = model->ctx()->enthalpy_converter();
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
   const IceModelVec3& ice_enthalpy = model->energy_balance_model()->enthalpy();
   const IceModelVec2S& ice_thickness = model->ice_thickness();
 
@@ -1543,7 +1543,7 @@ IceModel_ivolg::IceModel_ivolg(const IceModel *m)
 void IceModel_ivolg::update(double a, double b) {
   double volume = 0.0;
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   const IceModelVec2S
     &cell_area     = model->cell_area(),
@@ -1581,7 +1581,7 @@ IceModel_ivolf::IceModel_ivolf(const IceModel *m)
 void IceModel_ivolf::update(double a, double b) {
   double volume = 0.0;
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   const IceModelVec2S
     &cell_area     = model->cell_area(),
@@ -1964,7 +1964,7 @@ IceModelVec::Ptr IceModel_land_ice_area_fraction::compute_impl() {
     &surface_elevation = *variables.get_2d_scalar("surface_altitude"),
     &bed_topography    = *variables.get_2d_scalar("bedrock_altitude");
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   IceModelVec::AccessList list;
   list.add(thickness);
@@ -2052,7 +2052,7 @@ IceModelVec::Ptr IceModel_grounded_ice_sheet_area_fraction::compute_impl() {
     &ice_thickness  = *variables.get_2d_scalar("land_ice_thickness"),
     &bed_topography = *variables.get_2d_scalar("bedrock_altitude");
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   compute_grounded_cell_fraction(ice_density, ocean_density, sea_level,
                                  ice_thickness, bed_topography, cell_type,
@@ -2242,7 +2242,7 @@ IceModelVec::Ptr IceModel_height_above_flotation::compute_impl() {
   result->create(m_grid, "height_above_flotation", WITHOUT_GHOSTS);
   result->metadata(0) = m_vars[0];
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   const double
     ice_density   = m_config->get_double("constants.ice.density"),
@@ -2304,7 +2304,7 @@ IceModelVec::Ptr IceModel_ice_mass::compute_impl() {
   result->create(m_grid, "ice_mass", WITHOUT_GHOSTS);
   result->metadata(0) = m_vars[0];
 
-  const IceModelVec2CellType &cell_type = model->cell_type_mask();
+  const IceModelVec2CellType &cell_type = model->cell_type();
 
   const double
     ice_density = m_config->get_double("constants.ice.density");

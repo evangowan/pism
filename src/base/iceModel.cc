@@ -882,5 +882,17 @@ const energy::EnergyModel* IceModel::energy_balance_model() const {
   return m_energy_model;
 }
 
+const IceModelVec2S & IceModel::cell_area() const {
+  return m_cell_area;
+}
+
+const IceModelVec2CellType & IceModel::cell_type() const {
+  return m_cell_type;
+}
+
+const IceModelVec2S& IceModel::ice_surface_elevation() const {
+  return m_ice_surface_elevation;
+}
+
 
 } // end of namespace pism

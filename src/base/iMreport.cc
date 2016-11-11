@@ -37,14 +37,6 @@
 
 namespace pism {
 
-const IceModelVec2S & IceModel::cell_area() const {
-  return m_cell_area;
-}
-
-const IceModelVec2CellType & IceModel::cell_type_mask() const {
-  return m_cell_type;
-}
-
 /*!
   Computes fraction of the base which is melted.
 
