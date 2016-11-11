@@ -550,6 +550,8 @@ void IceModel::step(bool do_mass_continuity,
     }
 
     if (m_config->get_boolean("stress_balance.ssa.dirichlet_bc")) {
+      // FIXME: IceRegionalModel tries to substitute no_model_mask for bc_mask. This makes it
+      // impossible. We need to modify m_ssa_dirichlet_bc_mask in IceRegionalModel instead.
       inputs.bc_mask   = &m_ssa_dirichlet_bc_mask;
       inputs.bc_values = &m_ssa_dirichlet_bc_values;
     }
