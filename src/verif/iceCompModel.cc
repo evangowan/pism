@@ -628,9 +628,9 @@ void IceCompModel::reportErrors() {
   if ((m_testname == 'F' or m_testname == 'G' or m_testname == 'K' or m_testname == 'O') and
       not FlowLawIsPatersonBuddCold(flow_law, *m_config, EC)) {
     m_log->message(1,
-               "pismv WARNING: flow law must be cold part of Paterson-Budd ('-siafd_flow_law arr')\n"
-               "   for reported errors in test %c to be meaningful!\n",
-               m_testname);
+                   "pismv WARNING: flow law must be cold part of Paterson-Budd ('-siafd_flow_law arr')\n"
+                   "   for reported errors in test %c to be meaningful!\n",
+                   m_testname);
   }
 
   m_log->message(1,

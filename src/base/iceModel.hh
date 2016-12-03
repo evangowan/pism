@@ -104,6 +104,12 @@ struct FractureFields {
   IceModelVec2S flow_enhancement;
   IceModelVec2S age;
   IceModelVec2S toughness;
+
+  //! major and minor principal components of horizontal strain-rate tensor (temporary storage)
+  IceModelVec2 strain_rates;
+
+  //! components of horizontal stress tensor along axes and shear stress (temporary storage)
+  IceModelVec2 deviatoric_stresses;
 };
 
 
@@ -392,16 +398,16 @@ public:
 
   // see iMreport.cc;  methods for computing diagnostic quantities:
   // scalar:
-  double ice_volume() const;
-  double ice_volume_not_displacing_seawater() const;
-  double sealevel_volume() const;
-  double ice_volume_temperate() const;
-  double ice_volume_cold() const;
-  double ice_area() const;
-  double ice_area_grounded() const;
-  double ice_area_floating() const;
-  double ice_area_temperate() const;
-  double ice_area_cold() const;
+  double ice_volume(double thickness_threshold) const;
+  double ice_volume_not_displacing_seawater(double thickness_threshold) const;
+  double sealevel_volume(double thickness_threshold) const;
+  double ice_volume_temperate(double thickness_threshold) const;
+  double ice_volume_cold(double thickness_threshold) const;
+  double ice_area(double thickness_threshold) const;
+  double ice_area_grounded(double thickness_threshold) const;
+  double ice_area_floating(double thickness_threshold) const;
+  double ice_area_temperate(double thickness_threshold) const;
+  double ice_area_cold(double thickness_threshold) const;
 
 protected:
   // see iMutil.cc
@@ -521,4 +527,3 @@ void bedrock_surface_temperature(double sea_level,
 } // end of namespace pism
 
 #endif /* __iceModel_hh */
-

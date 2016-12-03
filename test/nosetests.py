@@ -170,6 +170,7 @@ def grid_from_file_test():
     enthalpy.write(pio)
 
     pio = PISM.PIO(grid.com, "netcdf3", output_file, PISM.PISM_READONLY)
+
     grid2 = PISM.IceGrid.FromFile(grid.ctx(), pio, "enthalpy", PISM.NOT_PERIODIC)
 
 

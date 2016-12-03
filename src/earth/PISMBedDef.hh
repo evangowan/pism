@@ -48,7 +48,7 @@ public:
 
   void set_elevation(const IceModelVec2S &input);
   void set_uplift(const IceModelVec2S &input);
-  
+
 protected:
   virtual void define_model_state_impl(const PIO &output) const;
   virtual void write_model_state_impl(const PIO &output) const;
@@ -60,6 +60,7 @@ protected:
   virtual void init_with_inputs_impl(const IceModelVec2S &bed_elevation,
                                      const IceModelVec2S &bed_uplift,
                                      const IceModelVec2S &ice_thickness);
+  virtual void apply_topg_offset(const std::string &filename);
 
   void compute_uplift(double dt_beddef);
 protected:
@@ -92,7 +93,7 @@ protected:
 //! Pointwide isostasy bed deformation model.
 class PBPointwiseIsostasy : public BedDef {
 public:
-  PBPointwiseIsostasy(IceGrid::ConstPtr g); 
+  PBPointwiseIsostasy(IceGrid::ConstPtr g);
   virtual ~PBPointwiseIsostasy();
 protected:
   virtual MaxTimestep max_timestep_impl(double t) const;

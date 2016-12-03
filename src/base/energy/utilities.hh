@@ -48,7 +48,8 @@ void compute_cts(const IceModelVec3 &enthalpy,
                  const IceModelVec2S &ice_thickness,
                  IceModelVec3 &result);
 
-double total_ice_enthalpy(const IceModelVec3 &ice_enthalpy,
+double total_ice_enthalpy(double thickness_threshold,
+                          const IceModelVec3 &ice_enthalpy,
                           const IceModelVec2S &ice_thickness,
                           const IceModelVec2S &cell_area);
 

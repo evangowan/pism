@@ -25,6 +25,7 @@
 #include "base/util/IceModelVec2CellType.hh"
 #include "base/util/io/PIO.hh"
 #include "utilities.hh"
+#include "base/util/pism_utilities.hh"
 
 namespace pism {
 namespace energy {

@@ -263,8 +263,8 @@ def run():
     WIDE_STENCIL = int(config.get_double("grid.max_stencil_width"))
 
     usage = \
-        """  pismi.py [-i IN.nc [-o OUT.nc]]/[-a INOUT.nc] [-inv_data inv_data.nc] [-inv_forward model] 
-                [-inv_design design_var] [-inv_method meth] 
+        """  pismi.py [-i IN.nc [-o OUT.nc]]/[-a INOUT.nc] [-inv_data inv_data.nc] [-inv_forward model]
+                [-inv_design design_var] [-inv_method meth]
     where:
     -i            IN.nc       is input file in NetCDF format: contains PISM-written model state
     -o            OUT.nc      is output file in NetCDF format to be overwritten
