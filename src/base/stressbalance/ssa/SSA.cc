@@ -360,14 +360,14 @@ void SSA::write_model_state_impl(const PIO &output) const {
   m_velocity.write(output);
 }
 
-void SSA::get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
-                          std::map<std::string, TSDiagnostic::Ptr> &ts_dict) const {
-
-  ShallowStressBalance::get_diagnostics_impl(dict, ts_dict);
+std::map<std::string, Diagnostic::Ptr> SSA::diagnostics_impl() const {
+  std::map<std::string, Diagnostic::Ptr> result = ShallowStressBalance::diagnostics_impl();
 
   // replace these diagnostics
-  dict["taud"] = Diagnostic::Ptr(new SSA_taud(this));
-  dict["taud_mag"] = Diagnostic::Ptr(new SSA_taud_mag(this));
+  result["taud"] = Diagnostic::Ptr(new SSA_taud(this));
+  result["taud_mag"] = Diagnostic::Ptr(new SSA_taud_mag(this));
+
+  return result;
 }
 
 SSA_taud::SSA_taud(const SSA *m)
@@ -376,8 +376,8 @@ SSA_taud::SSA_taud(const SSA *m)
   m_dof = 2;
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taud_x"));
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taud_y"));
+  m_vars = {SpatialVariableMetadata(m_sys, "taud_x"),
+            SpatialVariableMetadata(m_sys, "taud_y")};
 
   set_attrs("X-component of the driving shear stress at the base of ice", "",
             "Pa", "Pa", 0);
@@ -410,7 +410,7 @@ SSA_taud_mag::SSA_taud_mag(const SSA *m)
   : Diag<SSA>(m) {
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taud_mag"));
+  m_vars = {SpatialVariableMetadata(m_sys, "taud_mag")};
 
   set_attrs("magnitude of the driving shear stress at the base of ice", "",
             "Pa", "Pa", 0);
@@ -454,7 +454,7 @@ SSA_calving_front_pressure_difference::SSA_calving_front_pressure_difference(SSA
   : Diag<SSA>(m) {
 
   /* set metadata: */
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "ocean_pressure_difference"));
+  m_vars = {SpatialVariableMetadata(m_sys, "ocean_pressure_difference")};
   m_vars[0].set_double("_FillValue", m_fill_value);
 
   set_attrs("ocean pressure difference at calving fronts", "",

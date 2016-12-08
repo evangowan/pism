@@ -52,7 +52,7 @@ bool ends_with(const std::string &str, const std::string &suffix) {
 
 template <class T>
 std::string join_impl(const T& input, const std::string& separator) {
-  typename T::const_iterator j = input.begin();
+  auto j = input.begin();
   std::string result = *j;
   ++j;
   while (j != input.end()) {
@@ -83,7 +83,7 @@ std::vector<std::string> split(const std::string &input, char separator) {
   return result;
 }
 
-//! Transform a `separator`-separated list (a string) into a vector of strings.
+//! Transform a `separator`-separated list (a string) into a set of strings.
 std::set<std::string> set_split(const std::string &input, char separator) {
   std::istringstream input_list(input);
   std::string token;

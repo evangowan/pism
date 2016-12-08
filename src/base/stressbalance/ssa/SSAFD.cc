@@ -1679,8 +1679,8 @@ SSAFD_nuH::SSAFD_nuH(const SSAFD *m)
   // set metadata:
   m_dof = 2;
 
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "nuH[0]"));
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "nuH[1]"));
+  m_vars = {SpatialVariableMetadata(m_sys, "nuH[0]"),
+            SpatialVariableMetadata(m_sys, "nuH[1]")};
 
   set_attrs("ice thickness times effective viscosity, i-offset", "",
             "Pa s m", "kPa s m", 0);
@@ -1701,11 +1701,12 @@ IceModelVec::Ptr SSAFD_nuH::compute_impl() {
   return result;
 }
 
-void SSAFD::get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
-                            std::map<std::string, TSDiagnostic::Ptr> &ts_dict) const {
-  SSA::get_diagnostics_impl(dict, ts_dict);
+std::map<std::string, Diagnostic::Ptr> SSAFD::diagnostics_impl() const {
+  std::map<std::string, Diagnostic::Ptr> result = SSA::diagnostics_impl();
 
-  dict["nuH"] = Diagnostic::Ptr(new SSAFD_nuH(this));
+  result["nuH"] = Diagnostic::Ptr(new SSAFD_nuH(this));
+
+  return result;
 }
 
 const IceModelVec2Stag & SSAFD::integrated_viscosity() const {

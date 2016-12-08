@@ -65,8 +65,7 @@ public:
                       const IceModelVec2V &vel_input);
 
 protected:
-  virtual void get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
-                                    std::map<std::string, TSDiagnostic::Ptr> &ts_dict) const;
+  virtual std::map<std::string, Diagnostic::Ptr> diagnostics_impl() const;
 
   virtual void compute_surface_gradient(const StressBalanceInputs &inputs,
                                         IceModelVec2Stag &h_x, IceModelVec2Stag &h_y) const;

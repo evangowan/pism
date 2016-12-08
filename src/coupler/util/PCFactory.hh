@@ -19,12 +19,12 @@
 #ifndef _PCFACTORY_H_
 #define _PCFACTORY_H_
 
+#include <memory>
 #include <map>
 
 #include "base/util/IceGrid.hh"
 #include "base/util/error_handling.hh"
 #include "base/util/pism_const.hh"
-#include "base/util/pism_memory.hh"
 #include "base/util/pism_options.hh"
 
 namespace pism {
@@ -69,8 +69,8 @@ public:
     }
   };
 
-  typedef PISM_SHARED_PTR(ModelCreator) ModelCreatorPtr;
-  typedef PISM_SHARED_PTR(ModifierCreator) ModifierCreatorPtr;
+  typedef std::shared_ptr<ModelCreator> ModelCreatorPtr;
+  typedef std::shared_ptr<ModifierCreator> ModifierCreatorPtr;
 
   PCFactory<Model,Modifier>(IceGrid::ConstPtr g)
   : m_grid(g) {}
@@ -91,8 +91,7 @@ public:
     Model* result = NULL;
 
     // build a list of available models:
-    typename std::map<std::string, ModelCreatorPtr >::iterator k;
-    k = m_models.begin();
+    auto k = m_models.begin();
     model_list = "[" + (k++)->first;
     for (; k != m_models.end(); k++) {
       model_list += ", " + k->first;
@@ -100,8 +99,7 @@ public:
     model_list += "]";
 
     // build a list of available modifiers:
-    typename std::map<std::string, ModifierCreatorPtr >::iterator p;
-    p = m_modifiers.begin();
+    auto p = m_modifiers.begin();
     modifier_list = "[" + (p++)->first;
     for (; p != m_modifiers.end(); p++) {
       modifier_list += ", " + p->first;
@@ -116,7 +114,7 @@ public:
 
     // the first element has to be an *actual* model (not a modifier), so we
     // create it:
-    std::vector<std::string>::iterator j = choices->begin();
+    auto j = choices->begin();
 
     if (m_models.find(*j) == m_models.end()) {
       throw RuntimeError::formatted(PISM_ERROR_LOCATION, "%s model \"%s\" is not available.\n"

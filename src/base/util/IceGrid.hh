@@ -22,8 +22,7 @@
 #include <cassert>
 #include <vector>
 #include <string>
-
-#include "pism_memory.hh"
+#include <memory>
 
 #include "base/util/Context.hh"
 #include "base/util/PISMConfigInterface.hh"
@@ -204,8 +203,8 @@ class IceGrid {
 public:
   ~IceGrid();
 
-  typedef PISM_SHARED_PTR(IceGrid) Ptr;
-  typedef PISM_SHARED_PTR(const IceGrid) ConstPtr;
+  typedef std::shared_ptr<IceGrid> Ptr;
+  typedef std::shared_ptr<const IceGrid> ConstPtr;
 
   IceGrid(Context::Ptr ctx, const GridParameters &p);
 
@@ -234,6 +233,7 @@ public:
   void compute_point_neighbors(double X, double Y,
                                int &i_left, int &i_right,
                                int &j_bottom, int &j_top) const;
+  std::vector<int> compute_point_neighbors(double X, double Y) const;
   std::vector<double> compute_interp_weights(double x, double y) const;
 
   unsigned int kBelowHeight(double height) const;

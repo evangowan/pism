@@ -17,6 +17,7 @@
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <map>
+#include <numeric>
 #include <petscsys.h>
 #include <gsl/gsl_interp.h>
 
@@ -262,9 +263,9 @@ IceGrid::Ptr IceGrid::FromFile(Context::Ptr ctx,
 
   PIO file(ctx->com(), "netcdf3", filename, PISM_READONLY);
 
-  for (unsigned int k = 0; k < var_names.size(); ++k) {
-    if (file.inq_var(var_names[k])) {
-      return FromFile(ctx, file, var_names[k], periodicity);
+  for (auto name : var_names) {
+    if (file.inq_var(name)) {
+      return FromFile(ctx, file, name, periodicity);
     }
   }
 
@@ -294,9 +295,7 @@ IceGrid::Ptr IceGrid::FromFile(Context::Ptr ctx,
                   "         Using 2 levels and Lz of %3.3fm\n",
                   var_name.c_str(), file.inq_filename().c_str(), Lz);
 
-      p.z.clear();
-      p.z.push_back(0);
-      p.z.push_back(Lz);
+      p.z = {0.0, Lz};
     }
 
     // override periodicity
@@ -733,6 +732,12 @@ void IceGrid::compute_point_neighbors(double X, double Y,
   }
 }
 
+std::vector<int> IceGrid::compute_point_neighbors(double X, double Y) const {
+  int i_left, i_right, j_bottom, j_top;
+  this->compute_point_neighbors(X, Y, i_left, i_right, j_bottom, j_top);
+  return {i_left, i_right, j_bottom, j_top};
+}
+
 //! \brief Compute 4 interpolation weights necessary for linear interpolation
 //! from the current grid. See compute_point_neighbors for the ordering of
 //! neighbors.
@@ -753,13 +758,10 @@ std::vector<double> IceGrid::compute_interp_weights(double X, double Y) const{
     beta  = (Y - m_impl->y[j_bottom]) / (m_impl->y[j_top] - m_impl->y[j_bottom]);
   }
 
-  std::vector<double> result(4);
-  result[0] = alpha * beta;
-  result[1] = (1 - alpha) * beta;
-  result[2] = (1 - alpha) * (1 - beta);
-  result[3] = alpha * (1 - beta);
-
-  return result;
+  return {(1.0 - alpha) * (1.0 - beta),
+      alpha * (1.0 - beta),
+      alpha * beta,
+      (1.0 - alpha) * beta};
 }
 
 // Computes the hash corresponding to the DM with given dof and stencil_width.
@@ -1058,8 +1060,7 @@ grid_info::grid_info(const PIO &file, const std::string &variable,
       }
     }
 
-    for (unsigned int i = 0; i < dims.size(); ++i) {
-      std::string dimname = dims[i];
+    for (auto dimname : dims) {
 
       AxisType dimtype = file.inq_dimtype(dimname, unit_system);
 
@@ -1273,21 +1274,11 @@ void GridParameters::validate() const {
     throw RuntimeError::formatted(PISM_ERROR_LOCATION, "last z level is negative: %f", z.back());
   }
 
-  unsigned int sum = 0;
-  for (unsigned int k = 0; k < procs_x.size(); ++k) {
-    sum += procs_x[k];
-  }
-
-  if (sum != Mx) {
+  if (std::accumulate(procs_x.begin(), procs_x.end(), 0.0) != Mx) {
     throw RuntimeError(PISM_ERROR_LOCATION, "procs_x don't sum up to Mx");
   }
 
-  sum = 0;
-  for (unsigned int k = 0; k < procs_y.size(); ++k) {
-    sum += procs_y[k];
-  }
-
-  if (sum != My) {
+  if (std::accumulate(procs_y.begin(), procs_y.end(), 0.0) != My) {
     throw RuntimeError(PISM_ERROR_LOCATION, "procs_y don't sum up to My");
   }
 }
@@ -1316,39 +1307,32 @@ IceGrid::Ptr IceGrid::FromOptions(Context::Ptr ctx) {
     options::ignored(*log, "-z_spacing");
 
     // get grid from a PISM input file
-    std::vector<std::string> names;
-    names.push_back("enthalpy");
-    names.push_back("temp");
-
-    return IceGrid::FromFile(ctx, input_file, names, p);
+    return IceGrid::FromFile(ctx, input_file, {"enthalpy", "temp"}, p);
   } else if (input_file.is_set() and bootstrap) {
     // bootstrapping; get domain size defaults from an input file, allow overriding all grid
     // parameters using command-line options
 
     GridParameters input_grid(ctx->config());
 
-    std::vector<std::string> names;
-    names.push_back("land_ice_thickness");
-    names.push_back("bedrock_altitude");
-    names.push_back("thk");
-    names.push_back("topg");
+    std::vector<std::string> names = {"land_ice_thickness", "bedrock_altitude",
+                                      "thk", "topg"};
     bool grid_info_found = false;
 
     PIO nc(ctx->com(), "netcdf3", input_file, PISM_READONLY);
 
-    for (unsigned int i = 0; i < names.size(); ++i) {
+    for (auto name : names) {
 
-      grid_info_found = nc.inq_var(names[i]);
+      grid_info_found = nc.inq_var(name);
       if (not grid_info_found) {
-        // Failed to find using a short name. Try using names[i] as a
+        // Failed to find using a short name. Try using name as a
         // standard name...
         std::string dummy1;
         bool dummy2;
-        nc.inq_var("dummy", names[i], grid_info_found, dummy1, dummy2);
+        nc.inq_var("dummy", name, grid_info_found, dummy1, dummy2);
       }
 
       if (grid_info_found) {
-        input_grid = GridParameters(ctx, nc, names[i], p);
+        input_grid = GridParameters(ctx, nc, name, p);
         break;
       }
     }
@@ -1366,15 +1350,18 @@ IceGrid::Ptr IceGrid::FromOptions(Context::Ptr ctx) {
 
     IceGrid::Ptr result(new IceGrid(ctx, input_grid));
 
+    units::System::Ptr sys = ctx->unit_system();
+    units::Converter km(sys, "m", "km");
+
     // report on resulting computational box
     log->message(2,
                  "  setting computational box for ice from '%s' and\n"
                  "    user options: [%6.2f km, %6.2f km] x [%6.2f km, %6.2f km] x [0 m, %6.2f m]\n",
                  input_file->c_str(),
-                 (result->x0() - result->Lx())/1000.0,
-                 (result->x0() + result->Lx())/1000.0,
-                 (result->y0() - result->Ly())/1000.0,
-                 (result->y0() + result->Ly())/1000.0,
+                 km(result->x0() - result->Lx()),
+                 km(result->x0() + result->Lx()),
+                 km(result->y0() - result->Ly()),
+                 km(result->y0() + result->Ly()),
                  result->Lz());
 
     return result;

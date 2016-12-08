@@ -106,13 +106,15 @@ const IceModelVec2S& ShallowStressBalance::basal_frictional_heating() {
 }
 
 
-void ShallowStressBalance::get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
-                                           std::map<std::string, TSDiagnostic::Ptr> &/*ts_dict*/) const {
-  dict["beta"]     = Diagnostic::Ptr(new SSB_beta(this));
-  dict["taub"]     = Diagnostic::Ptr(new SSB_taub(this));
-  dict["taub_mag"] = Diagnostic::Ptr(new SSB_taub_mag(this));
-  dict["taud"]     = Diagnostic::Ptr(new SSB_taud(this));
-  dict["taud_mag"] = Diagnostic::Ptr(new SSB_taud_mag(this));
+std::map<std::string, Diagnostic::Ptr> ShallowStressBalance::diagnostics_impl() const {
+  std::map<std::string, Diagnostic::Ptr> result = {
+    {"beta",     Diagnostic::Ptr(new SSB_beta(this))},
+    {"taub",     Diagnostic::Ptr(new SSB_taub(this))},
+    {"taub_mag", Diagnostic::Ptr(new SSB_taub_mag(this))},
+    {"taud",     Diagnostic::Ptr(new SSB_taud(this))},
+    {"taud_mag", Diagnostic::Ptr(new SSB_taud_mag(this))}
+  };
+  return result;
 }
 
 
@@ -272,8 +274,8 @@ SSB_taud::SSB_taud(const ShallowStressBalance *m)
   m_dof = 2;
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taud_x"));
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taud_y"));
+  m_vars = {SpatialVariableMetadata(m_sys, "taud_x"),
+            SpatialVariableMetadata(m_sys, "taud_y")};
 
   set_attrs("X-component of the driving shear stress at the base of ice", "",
             "Pa", "Pa", 0);
@@ -329,7 +331,7 @@ SSB_taud_mag::SSB_taud_mag(const ShallowStressBalance *m)
   : Diag<ShallowStressBalance>(m) {
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taud_mag"));
+  m_vars = {SpatialVariableMetadata(m_sys, "taud_mag")};
 
   set_attrs("magnitude of the gravitational driving stress at the base of ice", "",
             "Pa", "Pa", 0);
@@ -357,8 +359,8 @@ SSB_taub::SSB_taub(const ShallowStressBalance *m)
   m_dof = 2;
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taub_x"));
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taub_y"));
+  m_vars = {SpatialVariableMetadata(m_sys, "taub_x"),
+            SpatialVariableMetadata(m_sys, "taub_y")};
 
   set_attrs("X-component of the shear stress at the base of ice", "",
             "Pa", "Pa", 0);
@@ -410,7 +412,7 @@ SSB_taub_mag::SSB_taub_mag(const ShallowStressBalance *m)
   : Diag<ShallowStressBalance>(m) {
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "taub_mag"));
+  m_vars = {SpatialVariableMetadata(m_sys, "taub_mag")};
 
   set_attrs("magnitude of the basal shear stress at the base of ice", "",
             "Pa", "Pa", 0);
@@ -471,7 +473,7 @@ void PrescribedSliding::init() {
 SSB_beta::SSB_beta(const ShallowStressBalance *m)
   : Diag<ShallowStressBalance>(m) {
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "beta"));
+  m_vars = {SpatialVariableMetadata(m_sys, "beta")};
 
   set_attrs("basal drag coefficient", "", "Pa s / m", "Pa s / m", 0);
 }

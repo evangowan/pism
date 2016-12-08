@@ -69,13 +69,11 @@ InitializationHelper::InitializationHelper(IceGrid::ConstPtr g, SurfaceModel* in
   }
 
   // collect pointers
-  {
-    m_variables.push_back(&m_ice_surface_mass_flux);
-    m_variables.push_back(&m_ice_surface_temperature);
-    m_variables.push_back(&m_ice_surface_liquid_water_fraction);
-    m_variables.push_back(&m_mass_held_in_surface_layer);
-    m_variables.push_back(&m_surface_layer_thickness);
-  }
+  m_variables = {&m_ice_surface_mass_flux,
+                 &m_ice_surface_temperature,
+                 &m_ice_surface_liquid_water_fraction,
+                 &m_mass_held_in_surface_layer,
+                 &m_surface_layer_thickness};
 }
 
 void InitializationHelper::attach_atmosphere_model_impl(atmosphere::AtmosphereModel *in) {
@@ -93,8 +91,8 @@ void InitializationHelper::init_impl() {
 
     PIO file(m_grid->com, "guess_mode", opts.filename, PISM_READONLY);
     const unsigned int last_record = file.inq_nrecords() - 1;
-    for (unsigned int k = 0; k < m_variables.size(); ++k) {
-      m_variables[k]->read(file, last_record);
+    for (auto v : m_variables) {
+      v->read(file, last_record);
     }
   } else {
     m_log->message(2, "* Performing a 'fake' surface model time-step for bootstrapping...\n");
@@ -104,8 +102,8 @@ void InitializationHelper::init_impl() {
 
   // Support regridding. This is needed to ensure that initialization using "-i" is equivalent to
   // "-i ... -bootstrap -regrid_file ..."
-  for (unsigned int k = 0; k < m_variables.size(); ++k) {
-    regrid("surface model initialization helper", *m_variables[k], REGRID_WITHOUT_REGRID_VARS);
+  for (auto v : m_variables) {
+    regrid("surface model initialization helper", *v, REGRID_WITHOUT_REGRID_VARS);
   }
 }
 
@@ -142,15 +140,15 @@ void InitializationHelper::surface_layer_thickness_impl(IceModelVec2S &result) c
 }
 
 void InitializationHelper::define_model_state_impl(const PIO &output) const {
-  for (unsigned int k = 0; k < m_variables.size(); ++k) {
-    m_variables[k]->define(output);
+  for (auto v : m_variables) {
+    v->define(output);
   }
   m_input_model->define_model_state(output);
 }
 
 void InitializationHelper::write_model_state_impl(const PIO &output) const {
-  for (unsigned int k = 0; k < m_variables.size(); ++k) {
-    m_variables[k]->write(output);
+  for (auto v : m_variables) {
+    v->write(output);
   }
   m_input_model->write_model_state(output);
 }

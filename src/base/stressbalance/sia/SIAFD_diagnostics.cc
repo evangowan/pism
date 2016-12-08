@@ -24,22 +24,24 @@
 namespace pism {
 namespace stressbalance {
 
-void SIAFD::get_diagnostics_impl(std::map<std::string, Diagnostic::Ptr> &dict,
-                                 std::map<std::string, TSDiagnostic::Ptr> &/*ts_dict*/) const {
-  dict["diffusivity"]           = Diagnostic::Ptr(new SIAFD_diffusivity(this));
-  dict["diffusivity_staggered"] = Diagnostic::Ptr(new SIAFD_diffusivity_staggered(this));
-  dict["schoofs_theta"]         = Diagnostic::Ptr(new SIAFD_schoofs_theta(this));
-  dict["thksmooth"]             = Diagnostic::Ptr(new SIAFD_thksmooth(this));
-  dict["topgsmooth"]            = Diagnostic::Ptr(new SIAFD_topgsmooth(this));
-  dict["h_x"]                   = Diagnostic::Ptr(new SIAFD_h_x(this));
-  dict["h_y"]                   = Diagnostic::Ptr(new SIAFD_h_y(this));
+std::map<std::string, Diagnostic::Ptr> SIAFD::diagnostics_impl() const {
+  std::map<std::string, Diagnostic::Ptr> result = {
+    {"diffusivity",           Diagnostic::Ptr(new SIAFD_diffusivity(this))},
+    {"diffusivity_staggered", Diagnostic::Ptr(new SIAFD_diffusivity_staggered(this))},
+    {"schoofs_theta",         Diagnostic::Ptr(new SIAFD_schoofs_theta(this))},
+    {"thksmooth",             Diagnostic::Ptr(new SIAFD_thksmooth(this))},
+    {"topgsmooth",            Diagnostic::Ptr(new SIAFD_topgsmooth(this))},
+    {"h_x",                   Diagnostic::Ptr(new SIAFD_h_x(this))},
+    {"h_y",                   Diagnostic::Ptr(new SIAFD_h_y(this))}
+  };
+  return result;
 }
 
 SIAFD_schoofs_theta::SIAFD_schoofs_theta(const SIAFD *m)
   : Diag<SIAFD>(m) {
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "schoofs_theta"));
+  m_vars = {SpatialVariableMetadata(m_sys, "schoofs_theta")};
 
   set_attrs("multiplier 'theta' in Schoof's (2003) theory of bed roughness in SIA", "",
             "1", "", 0);
@@ -64,7 +66,7 @@ SIAFD_topgsmooth::SIAFD_topgsmooth(const SIAFD *m)
   : Diag<SIAFD>(m) {
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "topgsmooth"));
+  m_vars = {SpatialVariableMetadata(m_sys, "topgsmooth")};
   set_attrs("smoothed bed elevation in Schoof's (2003) theory of bed roughness in SIA",
             "", "m", "m", 0);
 }
@@ -84,7 +86,7 @@ SIAFD_thksmooth::SIAFD_thksmooth(const SIAFD *m)
   : Diag<SIAFD>(m) {
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "thksmooth"));
+  m_vars = {SpatialVariableMetadata(m_sys, "thksmooth")};
   set_attrs("thickness relative to smoothed bed elevation in Schoof's (2003) theory of bed roughness in SIA",
             "", "m", "m", 0);
 }
@@ -110,7 +112,7 @@ SIAFD_diffusivity::SIAFD_diffusivity(const SIAFD *m)
   : Diag<SIAFD>(m) {
 
   // set metadata:
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "diffusivity"));
+  m_vars = {SpatialVariableMetadata(m_sys, "diffusivity")};
 
   set_attrs("diffusivity of SIA mass continuity equation", "",
             "m2 s-1", "m2 s-1", 0);
@@ -137,8 +139,8 @@ SIAFD_diffusivity_staggered::SIAFD_diffusivity_staggered(const SIAFD *m)
   // set metadata:
   m_dof = 2;
 
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "diffusivity_i"));
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "diffusivity_j"));
+  m_vars = {SpatialVariableMetadata(m_sys, "diffusivity_i"),
+            SpatialVariableMetadata(m_sys, "diffusivity_j")};
 
   set_attrs("diffusivity of SIA mass continuity equation on the staggered grid (i-offset)", "",
             "m2 s-1", "m2 s-1", 0);
@@ -169,8 +171,8 @@ SIAFD_h_x::SIAFD_h_x(const SIAFD *m)
   // set metadata:
   m_dof = 2;
 
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "h_x_i"));
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "h_x_j"));
+  m_vars = {SpatialVariableMetadata(m_sys, "h_x_i"),
+            SpatialVariableMetadata(m_sys, "h_x_j")};
 
   set_attrs("the x-component of the surface gradient, i-offset", "",
             "", "", 0);
@@ -206,8 +208,8 @@ SIAFD_h_y::SIAFD_h_y(const SIAFD *m)
   // set metadata:
   m_dof = 2;
 
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "h_y_i"));
-  m_vars.push_back(SpatialVariableMetadata(m_sys, "h_y_j"));
+  m_vars = {SpatialVariableMetadata(m_sys, "h_y_i"),
+            SpatialVariableMetadata(m_sys, "h_y_j")};
 
   set_attrs("the y-component of the surface gradient, i-offset", "",
             "", "", 0);

@@ -106,7 +106,7 @@ void IceModel::model_state_setup() {
 
   const bool use_input_file = input.type == INIT_BOOTSTRAP or input.type == INIT_RESTART;
 
-  PISM_SHARED_PTR(PIO) input_file;
+  std::shared_ptr<PIO> input_file;
 
   if (use_input_file) {
     input_file.reset(new PIO(m_grid->com, "guess_mode", input.filename, PISM_READONLY));
@@ -280,17 +280,13 @@ void IceModel::restart_2d(const PIO &input_file, unsigned int last_record) {
   m_log->message(2, "initializing 2D fields from NetCDF file '%s'...\n", filename.c_str());
 
   // Read the model state, mapping and climate_steady variables:
-  std::set<std::string> vars = m_grid->variables().keys();
-
-  std::set<std::string>::iterator i;
-  for (i = vars.begin(); i != vars.end(); ++i) {
+  for (auto v : m_grid->variables().keys()) {
     // FIXME: remove const_cast. This is bad.
-    IceModelVec *var = const_cast<IceModelVec*>(m_grid->variables().get(*i));
-    SpatialVariableMetadata &m = var->metadata();
+    IceModelVec *var = const_cast<IceModelVec*>(m_grid->variables().get(v));
 
     std::string
-      intent     = m.get_string("pism_intent"),
-      short_name = m.get_string("short_name");
+      intent     = var->metadata().get_string("pism_intent"),
+      short_name = var->metadata().get_string("short_name");
 
     if (intent == "model_state" ||
         intent == "mapping"     ||
@@ -774,17 +770,10 @@ void IceModel::init_calving() {
     m_submodels["float kill calving"] = m_float_kill_calving;
   }
 
-  std::set<std::string>::iterator j = methods.begin();
-  std::string unused;
-  while (j != methods.end()) {
-    unused += (*j + ",");
-    ++j;
-  }
-
-  if (not unused.empty()) {
+  if (not methods.empty()) {
     m_log->message(2,
-               "PISM ERROR: calving method(s) [%s] are unknown and are ignored.\n",
-               unused.c_str());
+                   "PISM ERROR: calving method(s) [%s] are unknown and are ignored.\n",
+                   set_join(methods, ",").c_str());
   }
 }
 

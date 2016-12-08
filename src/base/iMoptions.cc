@@ -96,18 +96,15 @@ std::set<std::string> IceModel::set_output_size(const std::string &keyword) {
   }
 
   // Add all the model-state variables:
-  std::set<std::string> vars = m_grid->variables().keys();
-
-  std::set<std::string>::const_iterator i;
-  for (i = vars.begin(); i != vars.end(); ++i) {
-    const SpatialVariableMetadata &m = m_grid->variables().get(*i)->metadata();
+  for (auto v : m_grid->variables().keys()) {
+    const SpatialVariableMetadata &m = m_grid->variables().get(v)->metadata();
 
     std::string intent = m.get_string("pism_intent");
 
     if (intent == "model_state" or
         intent == "mapping"     or
         intent == "climate_steady") {
-      result.insert(*i);
+      result.insert(v);
     }
   }
 
@@ -133,10 +130,9 @@ std::set<std::string> IceModel::set_output_size(const std::string &keyword) {
     variables += "," + m_config->get_string("output.sizes.big");
   }
 
-  std::vector<std::string> list = split(variables, ',');
-  for (unsigned int k = 0; k < list.size(); ++k) {
-    if (not list[k].empty()) {
-      result.insert(list[k]);
+  for (auto name : split(variables, ',')) {
+    if (not name.empty()) {
+      result.insert(name);
     }
   }
 
