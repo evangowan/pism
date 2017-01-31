@@ -82,14 +82,15 @@ void NullTransport::update_impl(double icet, double icedt) {
   m_dt = icedt;
 
   get_input_rate(icet,icedt,m_total_input);
+//
+//  const double tillwat_max = m_config->get_double("hydrology_tillwat_max"),
+    const double C          = m_config->get_double("hydrology_tillwat_decay_rate");
 
-  const double tillwat_max = m_config->get_double("hydrology_tillwat_max"),
-               C           = m_config->get_double("hydrology_tillwat_decay_rate");
-
-  if (tillwat_max < 0.0) {
-    throw RuntimeError("hydrology::NullTransport: hydrology_tillwat_max is negative.\n"
-                       "This is not allowed.");
-  }
+// probably don't need this error anymore
+//  if (tillwat_max < 0.0) {
+//    throw RuntimeError("hydrology::NullTransport: hydrology_tillwat_max is negative.\n"
+//                       "This is not allowed.");
+//  }
 
   const IceModelVec2Int *mask = m_grid->variables().get_2d_mask("mask");
 
@@ -98,6 +99,7 @@ void NullTransport::update_impl(double icet, double icedt) {
   list.add(*mask);
   list.add(m_Wtil);
   list.add(m_total_input);
+  list.add(m_tillwat_max);
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
 
@@ -105,7 +107,7 @@ void NullTransport::update_impl(double icet, double icedt) {
       m_Wtil(i,j) = 0.0;
     } else {
       m_Wtil(i,j) += icedt * (m_total_input(i,j) - C);
-      m_Wtil(i,j) = std::min(std::max(0.0, m_Wtil(i,j)), tillwat_max);
+      m_Wtil(i,j) = std::min(std::max(0.0, m_Wtil(i,j)), m_tillwat_max(i,j));
     }
   }
 }

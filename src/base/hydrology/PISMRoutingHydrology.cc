@@ -657,11 +657,12 @@ call addresses that.  Otherwise this is the same physical model with the
 same configurable parameters.
  */
 void Routing::raw_update_Wtil(double hdt) {
-  const double tillwat_max = m_config->get_double("hydrology_tillwat_max"),
-               C           = m_config->get_double("hydrology_tillwat_decay_rate");
+//  const double tillwat_max = m_config->get_double("hydrology_tillwat_max"),
+   const double  C           = m_config->get_double("hydrology_tillwat_decay_rate");
 
   IceModelVec::AccessList list;
   list.add(m_Wtil);
+  list.add(m_tillwat_max);
   list.add(m_Wtilnew);
   list.add(m_total_input);
 
@@ -669,7 +670,7 @@ void Routing::raw_update_Wtil(double hdt) {
     const int i = p.i(), j = p.j();
 
     m_Wtilnew(i,j) = m_Wtil(i,j) + hdt * (m_total_input(i,j) - C);
-    m_Wtilnew(i,j) = std::min(std::max(0.0, m_Wtilnew(i,j)), tillwat_max);
+    m_Wtilnew(i,j) = std::min(std::max(0.0, m_Wtilnew(i,j)), m_tillwat_max(i,j));
   }
 }
 
@@ -730,8 +731,9 @@ void Routing::update_impl(double icet, double icedt) {
   m_t = icet;
   m_dt = icedt;
 
-  if (m_config->get_double("hydrology_tillwat_max") < 0.0) {
-    throw RuntimeError("hydrology::Routing: hydrology_tillwat_max is negative.\n"
+// Evan: not sure why this is here, but modified it to be the no input value
+  if (m_config->get_double("hydrology_tillwat_max_no_var") < 0.0) {
+    throw RuntimeError("hydrology::Routing: hydrology_tillwat_max_no_var is negative.\n"
                        "This is not allowed.");
   }
 

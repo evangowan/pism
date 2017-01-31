@@ -80,6 +80,13 @@ MohrCoulombYieldStress::MohrCoulombYieldStress(IceGrid::ConstPtr g,
   m_tillwat.set_attrs("internal",
                       "copy of till water thickness held by MohrCoulombYieldStress",
                       "m", "");
+
+  m_tillwat_max_mc.create(m_grid, "tillwat_max_for_MohrCoulomb",
+                   WITHOUT_GHOSTS);
+  m_tillwat_max_mc.set_attrs("internal",
+                      "copy of till water max thickness held by MohrCoulombYieldStress",
+                      "m", "");
+
   bool addtransportable = m_config->get_boolean("tauc_add_transportable_water");
   if (addtransportable == true) {
     m_bwat.create(m_grid, "bwat_for_MohrCoulomb", WITHOUT_GHOSTS);
@@ -133,7 +140,7 @@ read-in-from-file state or with a default constant value from the config file.
 */
 void MohrCoulombYieldStress::init_impl() {
   {
-    std::string hydrology_tillwat_max = "hydrology_tillwat_max";
+    std::string hydrology_tillwat_max = "hydrology_tillwat_max_no_var";
     bool till_is_present = m_config->get_double(hydrology_tillwat_max) > 0.0;
 
     if (till_is_present == false) {
@@ -352,7 +359,7 @@ void MohrCoulombYieldStress::update_impl(double my_t, double my_dt) {
        addtransportable = m_config->get_boolean("tauc_add_transportable_water");
 
   const double high_tauc   = m_config->get_double("high_tauc"),
-               tillwat_max = m_config->get_double("hydrology_tillwat_max"),
+//               tillwat_max = m_config->get_double("hydrology_tillwat_max"),
                c0          = m_config->get_double("till_cohesion"),
                N0          = m_config->get_double("till_reference_effective_pressure"),
                e0overCc    = m_config->get_double("till_reference_void_ratio")
@@ -363,6 +370,7 @@ void MohrCoulombYieldStress::update_impl(double my_t, double my_dt) {
   hydrology::Routing* hydrowithtransport = dynamic_cast<hydrology::Routing*>(m_hydrology);
   if (m_hydrology) {
     m_hydrology->till_water_thickness(m_tillwat);
+    m_hydrology->till_water_thickness_max(m_tillwat_max_mc);
     m_hydrology->overburden_pressure(m_Po);
     if (addtransportable == true) {
         assert(hydrowithtransport != NULL);
@@ -379,6 +387,7 @@ void MohrCoulombYieldStress::update_impl(double my_t, double my_dt) {
   }
   list.add(m_tillwat);
   list.add(m_till_phi);
+  list.add(m_tillwat_max_mc);
   list.add(m_tauc);
   list.add(mask);
   list.add(bed_topography);
@@ -400,11 +409,11 @@ void MohrCoulombYieldStress::update_impl(double my_t, double my_dt) {
       if (slipperygl == true &&
           bed_topography(i,j) <= sea_level &&
           (m.next_to_floating_ice(i,j) || m.next_to_ice_free_ocean(i,j))) {
-        water = tillwat_max;
+        water = m_tillwat_max_mc(i,j);
       } else if (addtransportable == true) {
         water = m_tillwat(i,j) + tlftw * log(1.0 + m_bwat(i,j) / tlftw);
       }
-      double s    = water / tillwat_max,
+      double s    = water / m_tillwat_max_mc(i,j),
         Ntil = N0 * pow(delta * m_Po(i,j) / N0, s) * pow(10.0, e0overCc * (1.0 - s));
       Ntil = std::min(m_Po(i,j), Ntil);
 
@@ -494,8 +503,8 @@ void MohrCoulombYieldStress::tauc_to_phi() {
     N0            = m_config->get_double("till_reference_effective_pressure"),
     e0overCc      = (m_config->get_double("till_reference_void_ratio") /
                      m_config->get_double("till_compressibility_coefficient")),
-    delta         = m_config->get_double("till_effective_fraction_overburden"),
-    tillwat_max   = m_config->get_double("hydrology_tillwat_max");
+    delta         = m_config->get_double("till_effective_fraction_overburden");
+//    tillwat_max   = m_config->get_double("hydrology_tillwat_max");
 
   assert(m_hydrology != NULL);
 
@@ -508,6 +517,7 @@ void MohrCoulombYieldStress::tauc_to_phi() {
   list.add(mask);
   list.add(m_tauc);
   list.add(m_tillwat);
+  list.add(m_tillwat_max_mc);
   list.add(m_Po);
   list.add(m_till_phi);
 
@@ -528,7 +538,7 @@ void MohrCoulombYieldStress::tauc_to_phi() {
     } else if (m.ice_free(i, j)) {
       // no change
     } else { // grounded and there is some ice
-      double s    = m_tillwat(i,j) / tillwat_max,
+      double s    = m_tillwat(i,j) / m_tillwat_max_mc(i,j),
         Ntil = N0 * pow(delta * m_Po(i,j) / N0, s) * pow(10.0, e0overCc * (1.0 - s));
       Ntil = std::min(m_Po(i,j), Ntil);
       m_till_phi(i, j) = 180.0/M_PI * atan((m_tauc(i, j) - c0) / Ntil);

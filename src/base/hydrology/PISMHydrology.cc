@@ -49,6 +49,13 @@ Hydrology::Hydrology(IceGrid::ConstPtr g)
                  "effective thickness of subglacial water stored in till",
                  "m", "");
   m_Wtil.metadata().set_double("valid_min", 0.0);
+
+ // Evan: changing the maximum effective water thickness to be spatially variable
+  m_tillwat_max.create(m_grid, "hydrology_tillwat_max", WITHOUT_GHOSTS);
+  m_tillwat_max.set_attrs("model_state",
+                       "maximum effective water thicknes",
+                       "m", "");
+  m_tillwat_max.set_time_independent(true);
 }
 
 
@@ -148,6 +155,25 @@ void Hydrology::init() {
     m_Wtil.set(m_config->get_double("bootstrapping_tillwat_value_no_var"));
   }
 
+// Evan: change to allow spatially variable maximum till water thickness
+
+  bootstrap = false;
+  start = 0;
+  
+  use_input_file = find_pism_input(filename, bootstrap, start);
+
+  if (use_input_file) {
+    if (bootstrap) {
+      m_tillwat_max.regrid(filename, OPTIONAL,
+                    m_config->get_double("hydrology_tillwat_max_no_var"));
+    } else {
+      m_tillwat_max.read(filename, start);
+    }
+  } else {
+    m_tillwat_max.set(m_config->get_double("hydrology_tillwat_max_no_var"));
+  }
+
+
   // whether or not we could initialize from file, we could be asked to regrid from file
   regrid("Hydrology", m_Wtil);
 }
@@ -205,6 +231,11 @@ void Hydrology::till_water_thickness(IceModelVec2S &result) {
   result.copy_from(m_Wtil);
 }
 
+// Evan: added this
+//! Return the effective thickness of the water stored in till.
+void Hydrology::till_water_thickness_max(IceModelVec2S &result) {
+  result.copy_from(m_tillwat_max);
+}
 
 //! Set the wall melt rate to zero.  (The most basic subglacial hydrologies have no lateral flux or potential gradient.)
 void Hydrology::wall_melt(IceModelVec2S &result) {
@@ -216,9 +247,11 @@ void Hydrology::wall_melt(IceModelVec2S &result) {
 Checks \f$0 \le W_{til} \le W_{til}^{max} =\f$hydrology_tillwat_max.
  */
 void Hydrology::check_Wtil_bounds() {
-  double tillwat_max = m_config->get_double("hydrology_tillwat_max");
+//  double tillwat_max = m_config->get_double("hydrology_tillwat_max");
 
-  IceModelVec::AccessList list(m_Wtil);
+  IceModelVec::AccessList list;
+  list.add(m_Wtil);
+  list.add(m_tillwat_max);
   ParallelSection loop(m_grid->com);
   try {
     for (Points p(*m_grid); p; p.next()) {
@@ -229,10 +262,10 @@ void Hydrology::check_Wtil_bounds() {
                                       "at (i,j)=(%d,%d)", m_Wtil(i,j), i, j);
       }
 
-      if (m_Wtil(i,j) > tillwat_max) {
+      if (m_Wtil(i,j) > m_tillwat_max(i,j)) {
         throw RuntimeError::formatted("Hydrology: till water effective layer thickness Wtil(i,j) = %.6f m exceeds\n"
                                       "hydrology_tillwat_max = %.6f at (i,j)=(%d,%d)",
-                                      m_Wtil(i,j), tillwat_max, i, j);
+                                      m_Wtil(i,j), m_tillwat_max(i,j), i, j);
       }
     }
   } catch (...) {

@@ -408,11 +408,18 @@ netcdf pism_config {
     pism_config:hydrology_const_bmelt = 3.168876461e-10;
     pism_config:hydrology_const_bmelt_doc = "default value is equivalent to 1 cm per year of melt; only used if hydrology_use_const_bmelt = 'yes'";
 
-    pism_config:hydrology_tillwat_max_option = "hydrology_tillwat_max";
-    pism_config:hydrology_tillwat_max_units = "meters";
-    pism_config:hydrology_tillwat_max_type = "scalar";
-    pism_config:hydrology_tillwat_max = 2.0;
-    pism_config:hydrology_tillwat_max_doc = "maximum effective thickness of the water stored in till";
+//    pism_config:hydrology_tillwat_max_option = "hydrology_tillwat_max";
+//    pism_config:hydrology_tillwat_max_units = "meters";
+//    pism_config:hydrology_tillwat_max_type = "scalar";
+//    pism_config:hydrology_tillwat_max = 2.0;
+//    pism_config:hydrology_tillwat_max_doc = "maximum effective thickness of the water stored in till";
+
+
+    pism_config:hydrology_tillwat_max_no_var_option = "hydrology_tillwat_max_no_var";
+    pism_config:hydrology_tillwat_max_no_var_units = "meters";
+    pism_config:hydrology_tillwat_max_no_var_type = "scalar";
+    pism_config:hydrology_tillwat_max_no_var = 2.0;
+    pism_config:hydrology_tillwat_max_no_var_doc = "maximum effective thickness of the water stored in till";
 
     pism_config:hydrology_tillwat_decay_rate_option = "hydrology_tillwat_decay_rate";
     pism_config:hydrology_tillwat_decay_rate_units = "meter / second";
