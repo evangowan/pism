@@ -111,6 +111,10 @@ public:
   // all Hydrology models have a Wtil state variable, which this returns
   virtual void till_water_thickness(IceModelVec2S &result);
 
+  // Evan: added this
+  // all Hydrology models have a maximum till water thickness, which this returns
+  virtual void till_water_thickness_max(IceModelVec2S &result);
+
   // this diagnostic method returns the standard shallow approximation
   virtual void overburden_pressure(IceModelVec2S &result);
 
@@ -135,6 +139,7 @@ protected:
 protected:
   // this model's state
   IceModelVec2S m_Wtil;      // effective thickness of till
+  IceModelVec2S m_tillwat_max; // maximum wather thickness
   // this model's workspace
   IceModelVec2S m_total_input, m_bmelt_local;
 

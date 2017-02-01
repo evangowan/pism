@@ -79,6 +79,10 @@ void Hydrology::init() {
                            " at the ice sheet bed at the given location at the given time;"
                            " adds to bmelt");
 
+  options::String twm_file("-till_water_max_file",
+                           "A file that contains the maximum effective water thickness"
+                           " (in meters) in the till");
+
   options::Real itb_period_years("-hydrology_input_to_bed_period",
                                  "The period (i.e. duration before repeat), in years,"
                                  " of -hydrology_input_to_bed_file data", 0.0);
@@ -157,18 +161,19 @@ void Hydrology::init() {
 
 // Evan: change to allow spatially variable maximum till water thickness
 
-  bootstrap = false;
-  start = 0;
-  
-  use_input_file = find_pism_input(filename, bootstrap, start);
+  // read in maximum till water thickness
 
-  if (use_input_file) {
-    if (bootstrap) {
-      m_tillwat_max.regrid(filename, OPTIONAL,
-                    m_config->get_double("hydrology_tillwat_max_no_var"));
-    } else {
-      m_tillwat_max.read(filename, start);
-    }
+
+
+  if (twm_file.is_set()) {
+
+    m_log->message(2,
+               "  option -till_water_max_file seen; reading hydrology_tillwat_max from '%s'.\n", twm_file->c_str());
+
+	   m_tillwat_max.regrid(twm_file, CRITICAL);; // fails if not found!
+
+
+
   } else {
     m_tillwat_max.set(m_config->get_double("hydrology_tillwat_max_no_var"));
   }

@@ -49,7 +49,7 @@ protected:
   void tauc_to_phi();
 protected:
   bool m_topg_to_phi, m_tauc_to_phi;
-  IceModelVec2S m_till_phi, m_tillwat, m_Po;
+  IceModelVec2S m_till_phi, m_tillwat, m_Po, m_tillwat_max_mc;
   IceModelVec2S m_bwat;  // only allocated and used if tauc_add_transportable_water = true
   hydrology::Hydrology *m_hydrology;
 };
