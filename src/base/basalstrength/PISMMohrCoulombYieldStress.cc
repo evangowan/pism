@@ -174,14 +174,31 @@ void MohrCoulombYieldStress::init_impl() {
                        "Turn on, and specify, the till friction angle parameterization"
                        " based on bedrock elevation (topg)");
 
+  options::String phi_file("-phi_file",
+                           "A file containing the spacial distribution of the values of"
+                           " the till friction angle, phi");
+
   bool bootstrap = false;
   int start = 0;
   std::string filename;
   bool use_input_file = find_pism_input(filename, bootstrap, start);
 
+  if (topg_to_phi_option.is_set() and plastic_phi.is_set() and phi_file.is_set()) {
+    throw RuntimeError("only one of -plastic_phi, -topg_to_phi and -phi_file is allowed.");
+  }
+
   if (topg_to_phi_option.is_set() and plastic_phi.is_set()) {
     throw RuntimeError("only one of -plastic_phi and -topg_to_phi is allowed.");
   }
+
+  if (topg_to_phi_option.is_set() and phi_file.is_set()) {
+    throw RuntimeError("only one of -phi_file and -topg_to_phi is allowed.");
+  }
+
+  if (phi_file.is_set() and plastic_phi.is_set()) {
+    throw RuntimeError("only one of -plastic_phi and -phi_file is allowed.");
+  }
+
 
   if (topg_to_phi_option.is_set()) {
 
@@ -220,6 +237,14 @@ void MohrCoulombYieldStress::init_impl() {
                  phi_min, topg_min,
                  phi_min, topg_min, phi_max - phi_min, topg_max - topg_min, topg_min, topg_max,
                  phi_max, topg_max);
+ } else if(phi_file.is_set()) {
+
+	// Evan: adding option to read the till friction angle from a file
+
+    m_log->message(2,
+               "  option -phi_file seen; reading tillphi from '%s'.\n", phi_file->c_str());
+
+	   m_till_phi.regrid(phi_file, CRITICAL);; // fails if not found!
 
   } else if (use_input_file) {
     if (bootstrap) {
@@ -228,6 +253,8 @@ void MohrCoulombYieldStress::init_impl() {
     } else {
       m_till_phi.read(filename, start);
     }
+ 
+
   } else {
     // Use the default value *or* the value set using the -plastic_phi
     // command-line option.
