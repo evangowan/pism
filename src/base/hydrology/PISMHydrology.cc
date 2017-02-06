@@ -52,7 +52,7 @@ Hydrology::Hydrology(IceGrid::ConstPtr g)
 
  // Evan: changing the maximum effective water thickness to be spatially variable
   m_tillwat_max.create(m_grid, "hydrology_tillwat_max", WITHOUT_GHOSTS);
-  m_tillwat_max.set_attrs("model_state",
+  m_tillwat_max.set_attrs("internal",
                        "maximum effective water thicknes",
                        "m", "");
   m_tillwat_max.set_time_independent(true);
@@ -90,6 +90,10 @@ void Hydrology::init() {
   options::Real itb_reference_year("-hydrology_input_to_bed_reference_year",
                                    "The reference year for periodizing the"
                                    " -hydrology_input_to_bed_file data", 0.0);
+
+  options::Real
+    max_tillwater("-hydrology_tillwat_max_no_var", "maximum effective thickness of the water stored in till",
+                m_config->get_double("hydrology_tillwat_max_no_var"));
 
   // the following are IceModelVec pointers into IceModel generally and are read by code in the
   // update() method at the current Hydrology time
@@ -168,14 +172,17 @@ void Hydrology::init() {
   if (twm_file.is_set()) {
 
     m_log->message(2,
-               "  option -till_water_max_file seen; reading hydrology_tillwat_max from '%s'.\n", twm_file->c_str());
+               "  option -till_water_max_file seen; -hydrology_tillwat_max_no_var '%s'.\n", twm_file->c_str());
 
 	   m_tillwat_max.regrid(twm_file, CRITICAL);; // fails if not found!
 
 
 
   } else {
-    m_tillwat_max.set(m_config->get_double("hydrology_tillwat_max_no_var"));
+
+  //  m_log->message(2,
+    //           "  option -till_water_max_file not seen; reading -hydrology_tillwat_max from '%s'.\n", twm_file->c_str());
+    m_tillwat_max.set(max_tillwater);
   }
 
 
