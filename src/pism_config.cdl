@@ -1234,7 +1234,7 @@ netcdf pism_config {
 
     pism_config:mask_is_floating_thickness_standard_units = "meters";
     pism_config:mask_is_floating_thickness_standard_type = "scalar";
-    pism_config:mask_is_floating_thickness_standard = 1.0;
+    pism_config:mask_is_floating_thickness_standard = 0.0;
     pism_config:mask_is_floating_thickness_standard_doc = "If flotation criterion is different by more than this amount then mask is set to MASK_ICE_FREE_OCEAN or MASK_FLOATING.";
 
     pism_config:viewer_size_option = "view_size";
