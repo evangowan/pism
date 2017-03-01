@@ -184,6 +184,9 @@ netcdf pism_config {
     pism_config:basal_yield_stress.mohr_coulomb.topg_to_phi.topg_min_type = "scalar";
     pism_config:basal_yield_stress.mohr_coulomb.topg_to_phi.topg_min_units = "meters";
 
+
+
+
     pism_config:basal_yield_stress.slippery_grounding_lines = "no";
     pism_config:basal_yield_stress.slippery_grounding_lines_doc = "If yes, at icy grounded locations with bed elevations below sea level, within one cell of floating ice or ice-free ocean, make tauc as low as possible from the Mohr-Coulomb relation.  Specifically, at such locations replace the normally-computed tauc from the Mohr-Coulomb relation, which uses the effective pressure from the modeled amount of water in the till, by the minimum value of tauc from Mohr-Coulomb, i.e. by using the effective pressure corresponding to the maximum amount of till-stored water.  Does not alter the modeled or reported amount of till water, nor does this mechanism affect water conservation.";
     pism_config:basal_yield_stress.slippery_grounding_lines_option = "tauc_slippery_grounding_lines";
@@ -750,7 +753,7 @@ netcdf pism_config {
     pism_config:hydrology.maximum_time_step_units = "years";
 
     pism_config:hydrology.model = "null";
-    pism_config:hydrology.model_choices = "null,routing,distributed";
+    pism_config:hydrology.model_choices = "null,routing,distributed,hydrologymod";
     pism_config:hydrology.model_doc = "Basal hydrology sub-model.";
     pism_config:hydrology.model_option = "hydrology";
     pism_config:hydrology.model_type = "keyword";
@@ -808,6 +811,42 @@ netcdf pism_config {
     pism_config:hydrology.use_const_bmelt_doc = "if 'yes', subglacial hydrology model sees basal melt rate which is constant and given by hydrology.const_bmelt";
     pism_config:hydrology.use_const_bmelt_option = "hydrology_use_const_bmelt";
     pism_config:hydrology.use_const_bmelt_type = "boolean";
+
+// added by Evan for hydrology_mod
+    pism_config:hydrology.default_fraction_till = 1.0;
+    pism_config:hydrology.default_fraction_till_doc = "default fraction of surface covered with thick till";
+    pism_config:hydrology.default_fraction_till_option = "default_fraction_till";
+    pism_config:hydrology.default_fraction_till_type = "scalar";
+    pism_config:hydrology.default_fraction_till_units = "1";
+
+    pism_config:hydrology.tunnel_radius = 0.2;
+    pism_config:hydrology.tunnel_radius_doc = "radius of Rothlisberger channels";
+    pism_config:hydrology.tunnel_radius_option = "tunnel_radius";
+    pism_config:hydrology.tunnel_radius_type = "scalar";
+    pism_config:hydrology.tunnel_radius_units = "meters";
+
+
+    pism_config:hydrology.roughness_coefficient = 0.12;
+    pism_config:hydrology.roughness_coefficient_doc = "Manning roughness coefficient";
+    pism_config:hydrology.roughness_coefficient_option = "roughness_coefficient";
+    pism_config:hydrology.roughness_coefficient_type = "scalar";
+    pism_config:hydrology.roughness_coefficient_units = "meters";
+
+    // value assuming till has a d10 silt size (0.01 mm), and high density (5) using MacDonald et al (2012) equation
+    pism_config:hydrology.default_till_permeability = 5.27e-11;
+    pism_config:hydrology.default_till_permeability_doc = "Default till permeability";
+    pism_config:hydrology.default_till_permeability_option = "default_till_permeability";
+    pism_config:hydrology.default_till_permeability_type = "scalar";
+    pism_config:hydrology.default_till_permeability_units = "m s-1";
+
+    pism_config:hydrology.water_viscosity = 1.787e-3;
+    pism_config:hydrology.water_viscosity_doc = "Water viscosity at zero degrees";
+    pism_config:hydrology.water_viscosity_option = "water_viscosity";
+    pism_config:hydrology.water_viscosity_type = "scalar";
+    pism_config:hydrology.water_viscosity_units = "Pa s";
+
+
+// end of that
 
     pism_config:inverse.design.cH1     = 0;
     pism_config:inverse.design.cH1_doc = "weight of derivative part of an H1 norm for inversion design variables";

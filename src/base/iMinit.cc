@@ -22,6 +22,7 @@
 #include "iceModel.hh"
 #include "base/basalstrength/PISMConstantYieldStress.hh"
 #include "base/basalstrength/PISMMohrCoulombYieldStress.hh"
+//#include "base/basalstrength/PISMMohrCoulombYieldStressMod.hh"
 #include "base/basalstrength/basal_resistance.hh"
 #include "base/calving/CalvingAtThickness.hh"
 #include "base/calving/EigenCalving.hh"
@@ -32,6 +33,7 @@
 #include "base/calving/FrontalMelt.hh"
 #include "base/energy/BedThermalUnit.hh"
 #include "base/hydrology/PISMHydrology.hh"
+#include "base/hydrology/PISMHydrologyMod.hh"
 #include "base/stressbalance/PISMStressBalance.hh"
 #include "base/stressbalance/sia/SIAFD.hh"
 #include "base/stressbalance/ssa/SSAFD.hh"
@@ -587,6 +589,8 @@ void IceModel::allocate_subglacial_hydrology() {
 
   if (hydrology_model == "null") {
     m_subglacial_hydrology = new NullTransport(m_grid);
+  } else if (hydrology_model == "hydrologymod") {
+    m_subglacial_hydrology = new HydrologyMod(m_grid);
   } else if (hydrology_model == "routing") {
     m_subglacial_hydrology = new Routing(m_grid);
   } else if (hydrology_model == "distributed") {
@@ -619,6 +623,8 @@ void IceModel::allocate_basal_yield_stress() {
       m_basal_yield_stress_model = new ConstantYieldStress(m_grid);
     } else if (yield_stress_model == "mohr_coulomb") {
       m_basal_yield_stress_model = new MohrCoulombYieldStress(m_grid, m_subglacial_hydrology);
+//    } else if (yield_stress_model == "mohr_coulomb_mod") {
+//      m_basal_yield_stress_model = new MohrCoulombYieldStressMod(m_grid, m_subglacial_hydrology);
     } else {
       throw RuntimeError::formatted(PISM_ERROR_LOCATION, "yield stress model '%s' is not supported.",
                                     yield_stress_model.c_str());

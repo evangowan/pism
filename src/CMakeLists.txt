@@ -151,6 +151,7 @@ add_library (pism
   base/hydrology/PISMRoutingHydrology.cc
   base/hydrology/PISMDistributedHydrology.cc
   base/hydrology/hydrology_diagnostics.cc
+  base/hydrology/PISMHydrologyMod.cc
   base/calving/connected_components.cc
   base/calving/remove_narrow_tongues.cc
   base/calving/IcebergRemover.cc
