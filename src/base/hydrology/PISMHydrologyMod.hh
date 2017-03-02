@@ -58,6 +58,11 @@ protected:
   IceModelVec2V m_pressure_gradient;
   virtual void get_input_rate(double hydro_t, double hydro_dt, IceModelVec2S &result);
   virtual void update_impl(double t, double dt);
+//  virtual std::map<std::string, Diagnostic::Ptr> diagnostics_impl() const;
+
+  virtual void define_model_state_impl(const PIO &output) const;
+  virtual void write_model_state_impl(const PIO &output) const;
+
   virtual void pressure_gradient(IceModelVec2V &result, IceModelVec2S &result_mag, IceModelVec2S &result_angle);
   virtual void till_drainage(IceModelVec2S &result, double dt);
   virtual void tunnels(IceModelVec2S &result);

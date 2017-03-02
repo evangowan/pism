@@ -24,6 +24,7 @@
 #include "base/util/io/PIO.hh"
 #include "base/util/pism_options.hh"
 #include "hydrology_diagnostics.hh"
+//#include "hydrology_diagnostics_mod.hh"
 #include "base/util/pism_utilities.hh"
 #include "base/util/PISMVars.hh"
 #include "base/util/MaxTimestep.hh"
@@ -80,12 +81,14 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
                        "flux of water through the till",
                        "m s-1", "");
   m_tillwat_flux.metadata().set_double("valid_min", 0.0);
+//  m_grid->variables().add(m_tillwat_flux);
 
   m_excess_water.create(m_grid, "excess_water", WITHOUT_GHOSTS); // without ghosts for now, maybe change later
   m_excess_water.set_attrs("model_state",
                        "extra water flux from water not in till",
                        "m s-1", "");
-  m_excess_water.set_double("valid_min", 0.0);
+  m_excess_water.metadata().set_double("valid_min", 0.0);
+//  m_grid->variables().add(m_excess_water);
 
   m_theta.create(m_grid, "water_flow_direction", WITH_GHOSTS,1);
   m_theta.set_attrs("internal",
@@ -307,6 +310,36 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 }
 
+
+
+void HydrologyMod::define_model_state_impl(const PIO &output) const {
+  Hydrology::define_model_state_impl(output);
+  m_tillwat_flux.define(output);
+  m_excess_water.define(output);
+}
+
+void HydrologyMod::write_model_state_impl(const PIO &output) const {
+  Hydrology::write_model_state_impl(output);
+  m_tillwat_flux.write(output);
+  m_excess_water.write(output);
+}
+
+
+/*
+std::map<std::string, Diagnostic::Ptr> HydrologyMod::diagnostics_impl() const {
+  std::map<std::string, Diagnostic::Ptr> result = {
+    {"bwat",       Diagnostic::Ptr(new Hydrology_bwat(this))},
+    {"bwp",        Diagnostic::Ptr(new Hydrology_bwp(this))},
+    {"bwprel",     Diagnostic::Ptr(new Hydrology_bwprel(this))},
+    {"effbwp",     Diagnostic::Ptr(new Hydrology_effbwp(this))},
+    {"hydrobmelt", Diagnostic::Ptr(new Hydrology_hydrobmelt(this))},
+    {"hydroinput", Diagnostic::Ptr(new Hydrology_hydroinput(this))},
+    {"wallmelt",   Diagnostic::Ptr(new Hydrology_wallmelt(this))},
+  };
+  return result;
+}
+
+*/
 
 //! Copies the W variable, the modeled transportable water layer thickness.
 void HydrologyMod::subglacial_water_thickness(IceModelVec2S &result) const {
