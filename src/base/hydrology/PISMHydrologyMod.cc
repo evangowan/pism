@@ -88,6 +88,15 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
                        "extra water flux from water not in till",
                        "m s-1", "");
   m_excess_water.metadata().set_double("valid_min", 0.0);
+
+
+
+  m_excess_water_playground.create(m_grid, "excess_water_playground", WITHOUT_GHOSTS); 
+  m_excess_water_playground.set_attrs("internal",
+                       "extra water flux from water not in till",
+                       "m s-1", "");
+  m_excess_water_playground.metadata().set_double("valid_min", 0.0);
+
 //  m_grid->variables().add(m_excess_water);
 
   m_theta.create(m_grid, "water_flow_direction", WITH_GHOSTS,1);
@@ -299,7 +308,10 @@ void HydrologyMod::update_impl(double t, double dt) {
   //    m_log->message(2, "* ice free, should be 0...\n * m_wtil: %10.8f \n ", m_Wtil(i,j));
     } else {
 
+
       m_Wtil(i,j) = m_dt * (m_total_input(i, j)/m_fraction_till(i,j) - m_tillwat_flux(i,j));
+
+   // m_log->message(2, "* m_wtil: %5i %5i %10.8f %15.10f %15.10f \n ", i, j, m_Wtil(i,j),  m_total_input(i, j)*m_dt, m_tillwat_flux(i,j)*m_dt );
     }
 
 /*
@@ -340,7 +352,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 
       }
      if(mask.icy(i,j)){
-     m_log->message(2, "* m_wtil: %5i %5i %10.8f %15.10f %15.10f %15.10f \n ", i, j, m_Wtil(i,j), m_excess_water(i,j), m_total_input(i, j)*m_dt, -m_tillwat_flux(i,j)*m_dt );
+ //    m_log->message(2, "* m_wtil: %5i %5i %10.8f %15.10f %15.10f %15.10f \n ", i, j, m_Wtil(i,j), m_excess_water(i,j), m_total_input(i, j)*m_dt, -m_tillwat_flux(i,j)*m_dt );
     }
  //     m_log->message(2, "* m_excess_water: %10.8f \n ", m_excess_water(i,j));
   }
@@ -349,7 +361,14 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 // finally, update the excess water to have it go into adjacent cells
 
+
+  list.add(m_excess_water_playground);
+
   m_excess_water.update_ghosts();
+  m_theta.update_ghosts();
+
+  m_excess_water_playground.copy_from(m_excess_water);
+
    m_log->message(2,"* till_drainage before: \n");
   // next find the amount of water flow into each cell from adjacent cells with the updated ghosts
   double drainage, drainage_before;
@@ -357,36 +376,50 @@ void HydrologyMod::update_impl(double t, double dt) {
     const int i = p.i(), j = p.j();
     drainage_before = m_excess_water(i,j);
  //  m_log->message(2,"* till_drainage before: %14.10f \n", drainage_before);
-     m_excess_water(i,j) = 0.0;
+
+     m_excess_water_playground(i,j) = 0.0;
 //     sediment water flux into the cell due to adjacent sediments
+   if(mask.icy(i,j)) {
+ //   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water(i+1,j), m_excess_water(i-1,j), m_excess_water(i,j+1),  m_excess_water(i,j-1) );
 
     if(m_pressure_gradient(i+1,j).u > 0) { // water will flow in from the right cell
-//      m_log->message(2,"* m_pressure_gradient right (should be greater than zero): %14.10f %14.10f %15.10f \n", m_pressure_gradient(i+1,j).u, m_excess_water(i+1,j), m_theta(i+1,j));
-      m_excess_water(i,j) += (m_tillwat_flux(i+1,j) + m_excess_water(i+1,j))  * abs(cos(m_theta(i+1,j)));
+  //    m_log->message(2,"* m_pressure_gradient right (should be greater than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i+1,j).u, m_excess_water(i+1,j), m_tillwat_flux(i+1,j)*m_dt);
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i+1,j)*m_dt + m_excess_water(i+1,j))  * fabs(cos(m_theta(i+1,j)));
+  //    m_log->message(2,"* theta %5i %5i %14.10f %14.10f %14.10f  \n",i, j, fabs(cos(m_theta(i+1,j))), cos(m_theta(i+1,j)), m_theta(i+1,j));
+   //   m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  m_excess_water_playground(i,j), fabs(cos(m_theta(i+1,j))), cos(m_theta(i+1,j)), m_theta(i+1,j));
     }
 
     if(m_pressure_gradient(i-1,j).u < 0) { // water will flow in from the left cell
- //   m_log->message(2,"* m_pressure_gradient left (should be less than zero): %14.10f %14.10f %15.10f \n", m_pressure_gradient(i-1,j).u, m_excess_water(i-1,j), m_theta(i-1,j));
-      m_excess_water(i,j) += (m_tillwat_flux(i-1,j) + m_excess_water(i-1,j)) * abs(cos(m_theta(i-1,j)));
+   // m_log->message(2,"* m_pressure_gradient left (should be less than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i-1,j).u, m_excess_water(i-1,j), m_tillwat_flux(i-1,j)*m_dt);
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i-1,j)*m_dt + m_excess_water(i-1,j)) * fabs(cos(m_theta(i-1,j)));
+   //   m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i-1,j));
+    //  m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  m_excess_water_playground(i,j), fabs(cos(m_theta(i-1,j))), cos(m_theta(i-1,j)), m_theta(i-1,j));
     }
 
     if(m_pressure_gradient(i,j+1).v > 0) { // water will flow in from the cell above
- //   m_log->message(2,"* m_pressure_gradient above (should be greater than zero): %14.10f %14.10f %15.10f \n", m_pressure_gradient(i,j+1).u, m_excess_water(i,j+1), m_theta(i,j+1));
-      m_excess_water(i,j) += (m_tillwat_flux(i,j+1) + m_excess_water(i,j+1))  * abs(sin(m_theta(i,j+1)));
+//    m_log->message(2,"* m_pressure_gradient above (should be greater than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i,j+1).u, m_excess_water(i,j+1), m_tillwat_flux(i,j+1)*m_dt);
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j+1)*m_dt + m_excess_water(i,j+1))  * fabs(sin(m_theta(i,j+1)));
+   //   m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i,j+1));
+   //   m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  m_excess_water_playground(i,j), fabs(sin(m_theta(i,j+1))), sin(m_theta(i,j+1)), m_theta(i,j+1));
     }
     if(m_pressure_gradient(i,j-1).v < 0) { // water will flow in from the cell below
-//    m_log->message(2,"* m_pressure_gradient below (should be less than zero): %14.10f %14.10f %15.10f \n", m_pressure_gradient(i,j-1).u, m_excess_water(i,j-1), m_theta(i,j-1));
-      m_excess_water(i,j) += (m_tillwat_flux(i,j-1) + m_excess_water(i,j-1)) * abs(sin(m_theta(i,j-1)));
+  //  m_log->message(2,"* m_pressure_gradient below (should be less than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i,j-1).u, m_excess_water(i,j-1), m_tillwat_flux(i,j-1)*m_dt);
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j-1)*m_dt + m_excess_water(i,j-1)) * fabs(sin(m_theta(i,j-1)));
+  //    m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i,j-1));
+  //    m_log->message(2,"* answer %5i %5i %14.10f  %14.10f %14.10f %14.10f\n",i, j,  m_excess_water_playground(i,j), fabs(sin(m_theta(i,j-1))), sin(m_theta(i,j-1)), m_theta(i,j-1));
     }
-    drainage = m_excess_water(i,j);
-   if(mask.icy(i, j)) {
-//   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f \n", i, j, drainage_before, drainage, m_Wtil(i,j));
+    drainage = m_excess_water_playground(i,j);
+
+   m_log->message(2,"> %5i %5i %14.10f \n", i, j, m_excess_water_playground(i,j));
+  
+   
+
    }
 
  //   m_log->message(2,"* till_drainage after: %14.10f \n", drainage);
   }
 
-
+  m_excess_water.copy_from(m_excess_water_playground);
   m_log->message(2,
              "* finished calculating hydrology ...\n");
 
@@ -466,6 +499,11 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
     dx = m_grid->dx(),
     dy = m_grid->dy();
 
+//  m_log->message(2,"**************************************************** ...\n");
+//  m_log->message(2,"dx: %15.10f \n", dx);
+//  m_log->message(2,"dx: %15.10f \n", dy);
+
+//  m_log->message(2,"**************************************************** ...\n");
 
 
   IceModelVec::AccessList list{&m_Pover_ghosts};
@@ -494,7 +532,7 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
       result(i,j).v = ((m_Pover_ghosts(i+1,j+1) + 2.0 * m_Pover_ghosts(i,j+1) + m_Pover_ghosts(i-1,j+1)) -
 			    (m_Pover_ghosts(i+1,j-1) + 2.0 * m_Pover_ghosts(i,j-1) + m_Pover_ghosts(i-1,j-1))) / (8.0 * dy);
 
- //     m_log->message(2,"gradient u and v: %12.2f %12.2f \n", result(i,j).u, result(i,j).v );
+//      m_log->message(2,"gradient u and v: %5i %5i %12.2f %12.2f \n", i, j, result(i,j).u, result(i,j).v );
     } else {
       result(i,j).u = 0.0;
 
@@ -557,6 +595,10 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
       result_angle(i,j) = 0;
     }
 
+   if(mask.icy(i,j)) {
+    m_log->message(2,"angle: %5i %5i %15.10f  \n", i, j, result_angle(i,j) );
+   }
+
   }
 
   result.update_ghosts();
@@ -583,6 +625,8 @@ void HydrologyMod::till_drainage(IceModelVec2S &result, double dt) {
   list.add(m_pressure_gradient);
   list.add(m_theta);
   list.add(m_fraction_till);
+  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
+  list.add(mask);
   
   const double water_viscosity = m_config->get_double("hydrology.water_viscosity");
   double drainage;
@@ -596,6 +640,12 @@ void HydrologyMod::till_drainage(IceModelVec2S &result, double dt) {
    // I'm setting it so that the rate can only be at maximum complete drainage during the time step
 
    double drainage_thickness = result(i,j) * m_dt;
+
+   if(mask.icy(i,j)) {
+ //    m_log->message(2,"%5i %5i %14.10f %14.10f \n", i, j, result(i,j),  m_gradient_magnitude(i,j));
+
+   }
+
 
    if(m_Wtil(i,j)*m_fraction_till(i,j) < drainage_thickness) {
 //     result(i,j) = m_Wtil(i,j)*m_fraction_till(i,j) / m_dt;  // commenting out for now

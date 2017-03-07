@@ -70,7 +70,7 @@ protected:
   virtual MaxTimestep max_timestep_impl(double t) const;
 
 private:
-  IceModelVec2S m_theta; 
+  IceModelVec2S m_theta, m_excess_water_playground; 
 
 };
 
