@@ -236,13 +236,15 @@ void HydrologyMod::get_input_rate(double hydro_t, double hydro_dt,
       if (m_inputtobed != NULL) {
         result(i,j) += (*m_inputtobed)(i,j);
       }
-      result(i,j) += m_excess_water(i,j) / hydro_dt; // added
- //   m_log->message(2, "%5i %5i %16.14f %16.14f \n", i, j, input_rate, m_excess_water(i,j) );
+      result(i,j) += m_excess_water(i,j); // added
+
     } else {
       result(i,j) = 0.0;
     }
     input_rate=result(i,j);
-
+    if(mask.icy(i,j)){
+ //   m_log->message(2, "%5i %5i %16.14f %16.14f \n", i, j, input_rate*hydro_dt, m_excess_water(i,j) );
+   }
   }
 
   m_log->message(2, "* finished get_input_rate\n");
@@ -289,72 +291,101 @@ void HydrologyMod::update_impl(double t, double dt) {
   list.add(m_excess_water);
 
   m_log->message(2, "* starting to calculate the water in the till...\n");
+  double flux_before;
+  double flux_ratio;
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
-
+    flux_before= m_tillwat_flux(i,j);
  //     m_log->message(2, "* common vars...\n * dt: %10.8f \n * m_fraction_till: %7.2f \n * m_total_input %10.8f \n * m_tillwat_flux %10.8f \n", m_dt, m_fraction_till(i,j), m_total_input(i, j), m_tillwat_flux(i,j));
 
     if (mask.ocean(i,j) ) {
 
-      // the other models say that till in the ocean will be have zero water layer thickness, of course it should be fully saturated, and in my scheme this is a necessary condition
+      // the other models say that till in the ocean will be have zero water layer thickness, of course it should be fully saturated
       m_Wtil(i, j) = tillwat_max;
       m_excess_water(i,j) = 0;
- //     m_log->message(2, "* ocean, should be tillwat_max...\n * m_wtil: %10.8f \n", m_Wtil(i,j));
     } else if( mask.ice_free(i,j)) {
 
       // land without ice will be dry, will need to change it when there are lakes added
       m_Wtil(i,j) = 0.0;
       m_excess_water(i,j) = 0;
-  //    m_log->message(2, "* ice free, should be 0...\n * m_wtil: %10.8f \n ", m_Wtil(i,j));
+
     } else {
 
+      // till is filled if the amount of water entering the cell is greater than the till water flux
 
-      m_Wtil(i,j) = m_dt * (m_total_input(i, j)/m_fraction_till(i,j) - m_tillwat_flux(i,j));
+      if(m_tillwat_flux(i,j) > 0.0) {
+        flux_ratio = m_total_input(i, j) / (m_tillwat_flux(i,j) * m_fraction_till(i,j));
+      } else {
+       if(m_total_input(i, j) > 0.0) {
+        flux_ratio = 1.0;
+       } else {
+        flux_ratio = 0.0;
+       }
+      }
 
-   // m_log->message(2, "* m_wtil: %5i %5i %10.8f %15.10f %15.10f \n ", i, j, m_Wtil(i,j),  m_total_input(i, j)*m_dt, m_tillwat_flux(i,j)*m_dt );
+//      if(m_gradient_magnitude(i,j) < 1) { // any place where the gradient is zero, assume it is frozen to base with no till water. Probably later make this dependent on basal temperature
+//       flux_ratio = 0.0;
+//      }
+      
+      if(flux_ratio >= 1.0) {
+        m_Wtil(i,j) = tillwat_max;
+      } else {
+
+        m_Wtil(i,j) = tillwat_max * flux_ratio;
+      }
+
+
+      m_excess_water(i,j) = m_total_input(i, j);
+
+      m_log->message(2, "%5i %5i %15.10f %15.10f %15.10f \n", i, j, m_total_input(i, j), m_tillwat_flux(i,j) * m_fraction_till(i,j), flux_ratio  );
+
     }
 
 /*
-      if(m_total_input(i, j) > m_tillwat_flux(i,j) * m_fraction_till(i,j)) {
-        m_Wtil(i, j) += m_dt * (m_total_input(i, j) - m_tillwat_flux(i,j) * m_fraction_till(i,j));
+    } else if (m_total_input(i, j)/m_fraction_till(i,j) < m_tillwat_flux(i,j)) {  
 
+      // the till water flux cannot be greater than the input
 
+      m_Wtil(i,j) = m_dt * m_total_input(i, j)/m_fraction_till(i,j);
+      
 
-      } else {
-        m_tillwat_flux(i,j) = m_total_input(i,j); // complete drainage
-        m_Wtil(i,j) = 0.0;
+      m_tillwat_flux(i,j) = m_total_input(i, j)/m_fraction_till(i,j);
 
-      }
+    } else {
+      
+      m_Wtil(i,j) = m_dt * m_total_input(i, j)/m_fraction_till(i,j);
+
+    }
+
 */
 
- //     m_log->message(2, "* m_wtil: %5i %5i %10.8f %15.10f %15.10f \n ", i, j, m_Wtil(i,j), m_total_input(i, j)*m_dt, -m_tillwat_flux(i,j)*m_dt );
-      if(m_Wtil(i,j) < 0) { // should be zero
 
+//    m_log->message(2, "* m_Wtil: %5i %5i %10.8f %15.10f %15.10f %15.10f \n ", i, j, m_Wtil(i,j), m_total_input(i, j)*m_dt, -m_tillwat_flux(i,j)*m_dt,m_gradient_magnitude(i,j)  );
 
-       m_Wtil(i, j) = 0;
-       m_excess_water(i,j) = 0;
+/*
 
-       m_tillwat_flux(i,j) = m_total_input(i, j)/m_fraction_till(i,j); // need to reduce the amount of till water to the input rate
-
- //     m_log->message(2, "* till water is zero...\n * m_wtil: %10.8f \n", m_Wtil(i,j));
-      } else if (m_Wtil(i,j) > tillwat_max) { // add the extra water to m_excess_water
+      if (m_Wtil(i,j) > tillwat_max) { // add the extra water to m_excess_water
          if(m_gradient_magnitude(i,j) > 0.0) { // but only if the magnitude of the gradient is greater than 0, right not zero gradient means black hole
-           m_excess_water(i,j) = (m_Wtil(i,j) - tillwat_max) * m_fraction_till(i,j);
+
+           m_excess_water(i,j) = (m_total_input(i, j) - tillwat_max * m_fraction_till(i,j) / m_dt);
          } else{
            m_excess_water(i,j) = 0;
          }
          m_Wtil(i,j) = tillwat_max;
-  //     m_log->message(2, "* till water is full, put excess in m_excess_water...\n * m_wtil: %10.8f \n", m_Wtil(i,j));
+
       } else { // no excess water and the till is not full
 
        m_excess_water(i,j) = 0;
-   //    m_log->message(2, "* till water is not full...\n * m_wtil: %10.8f \n", m_Wtil(i,j));
+
 
       }
      if(mask.icy(i,j)){
  //    m_log->message(2, "* m_wtil: %5i %5i %10.8f %15.10f %15.10f %15.10f \n ", i, j, m_Wtil(i,j), m_excess_water(i,j), m_total_input(i, j)*m_dt, -m_tillwat_flux(i,j)*m_dt );
+
+    m_log->message(2, "* m_wtil: %5i %5i %15.10f %15.10f %15.10f \n ", i, j,m_total_input(i, j), flux_before, m_tillwat_flux(i,j) );
     }
- //     m_log->message(2, "* m_excess_water: %10.8f \n ", m_excess_water(i,j));
+*/
+
   }
 
 
@@ -367,54 +398,128 @@ void HydrologyMod::update_impl(double t, double dt) {
   m_excess_water.update_ghosts();
   m_theta.update_ghosts();
 
-  m_excess_water_playground.copy_from(m_excess_water);
-
+//  m_excess_water_playground.copy_from(m_excess_water);
+  m_excess_water_playground.set(0.0);
+  double seconds_in_year = 365*24*3600;
    m_log->message(2,"* till_drainage before: \n");
   // next find the amount of water flow into each cell from adjacent cells with the updated ghosts
   double drainage, drainage_before;
+  unsigned int left, right, up, down;
+  double res_left, res_right, res_up, res_down;
+
+
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
     drainage_before = m_excess_water(i,j);
  //  m_log->message(2,"* till_drainage before: %14.10f \n", drainage_before);
 
-     m_excess_water_playground(i,j) = 0.0;
 //     sediment water flux into the cell due to adjacent sediments
-   if(mask.icy(i,j)) {
+
+   
+   if(mask.icy(i,j) && m_gradient_magnitude(i,j) > 0.0) {
+
+    res_left = 0.0;
+    res_right = 0.0;
+    res_up = 0.0;
+    res_down = 0.0;
+
+    left = 0;
+    right = 0;
+    up = 0;
+    down = 0;
+
+    res_right =  fabs(m_pressure_gradient(i,j).u) / (fabs(m_pressure_gradient(i,j).u) + fabs(m_pressure_gradient(i,j).v));
+    res_up = fabs(m_pressure_gradient(i,j).v) / (fabs(m_pressure_gradient(i,j).u) + fabs(m_pressure_gradient(i,j).v));
+
+    if(m_pressure_gradient(i,j).u > 0) {
+      if(mask.icy(i-1,j)) {
+//        m_excess_water_playground(i-1,j) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_right;
+        m_excess_water_playground(i-1,j) += ( m_excess_water(i,j))  * res_right;
+      }
+    } else {
+      if(mask.icy(i+1,j)) {
+//        m_excess_water_playground(i+1,j) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_right;
+        m_excess_water_playground(i+1,j) += ( m_excess_water(i,j))  * res_right;
+      }
+
+    }
+
+    if(m_pressure_gradient(i,j).v > 0) {
+      if(mask.icy(i,j-1)) {
+//        m_excess_water_playground(i,j-1) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_up;
+        m_excess_water_playground(i,j-1) += ( m_excess_water(i,j))  * res_up;
+      }
+    } else {
+      if(mask.icy(i,j+1)) {
+//        m_excess_water_playground(i,j+1) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_up;
+        m_excess_water_playground(i,j+1) += ( m_excess_water(i,j))  * res_up;
+      }
+    }
+  }
+
+/*
  //   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water(i+1,j), m_excess_water(i-1,j), m_excess_water(i,j+1),  m_excess_water(i,j-1) );
+ //  m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, m_pressure_gradient(i+1,j).u, m_pressure_gradient(i-1,j).u, m_pressure_gradient(i,j+1).v, m_pressure_gradient(i,j-1).v );
 
     if(m_pressure_gradient(i+1,j).u > 0) { // water will flow in from the right cell
   //    m_log->message(2,"* m_pressure_gradient right (should be greater than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i+1,j).u, m_excess_water(i+1,j), m_tillwat_flux(i+1,j)*m_dt);
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i+1,j)*m_dt + m_excess_water(i+1,j))  * fabs(cos(m_theta(i+1,j)));
-  //    m_log->message(2,"* theta %5i %5i %14.10f %14.10f %14.10f  \n",i, j, fabs(cos(m_theta(i+1,j))), cos(m_theta(i+1,j)), m_theta(i+1,j));
+     right = 1;
+     if (m_gradient_magnitude(i+1,j) > 0 && mask.icy(i+1,j)){
+      res_right =  fabs(m_pressure_gradient(i+1,j).u) / (fabs(m_pressure_gradient(i+1,j).u) + fabs(m_pressure_gradient(i+1,j).v));
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i+1,j) + m_excess_water(i+1,j))  * res_right;
+  //    m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f  \n",i, j, fabs(cos(m_theta(i+1,j))), cos(m_theta(i+1,j)), m_theta(i+1,j),(m_tillwat_flux(i+1,j) + m_excess_water(i+1,j)) );
    //   m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  m_excess_water_playground(i,j), fabs(cos(m_theta(i+1,j))), cos(m_theta(i+1,j)), m_theta(i+1,j));
+     }
     }
 
     if(m_pressure_gradient(i-1,j).u < 0) { // water will flow in from the left cell
+
+     left = 1;
+     if (m_gradient_magnitude(i-1,j) > 0 && mask.icy(i-1,j)){
+      res_left = fabs(m_pressure_gradient(i-1,j).u) / (fabs(m_pressure_gradient(i-1,j).u) + fabs(m_pressure_gradient(i-1,j).v));
    // m_log->message(2,"* m_pressure_gradient left (should be less than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i-1,j).u, m_excess_water(i-1,j), m_tillwat_flux(i-1,j)*m_dt);
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i-1,j)*m_dt + m_excess_water(i-1,j)) * fabs(cos(m_theta(i-1,j)));
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i-1,j) + m_excess_water(i-1,j)) *  res_left ;
    //   m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i-1,j));
-    //  m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  m_excess_water_playground(i,j), fabs(cos(m_theta(i-1,j))), cos(m_theta(i-1,j)), m_theta(i-1,j));
+//      m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,   fabs(cos(m_theta(i-1,j))), cos(m_theta(i-1,j)), m_theta(i-1,j), (m_tillwat_flux(i-1,j) + m_excess_water(i-1,j)));
+     }
+
     }
 
     if(m_pressure_gradient(i,j+1).v > 0) { // water will flow in from the cell above
+     up = 1;
+     if (m_gradient_magnitude(i,j+1) > 0 && mask.icy(i,j+1)){
+      res_up = fabs(m_pressure_gradient(i,j+1).v) / (fabs(m_pressure_gradient(i,j+1).u) + fabs(m_pressure_gradient(i,j+1).v));
 //    m_log->message(2,"* m_pressure_gradient above (should be greater than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i,j+1).u, m_excess_water(i,j+1), m_tillwat_flux(i,j+1)*m_dt);
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j+1)*m_dt + m_excess_water(i,j+1))  * fabs(sin(m_theta(i,j+1)));
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j+1) + m_excess_water(i,j+1))  * res_up  ;
    //   m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i,j+1));
-   //   m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  m_excess_water_playground(i,j), fabs(sin(m_theta(i,j+1))), sin(m_theta(i,j+1)), m_theta(i,j+1));
+  //    m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  fabs(sin(m_theta(i,j+1))), sin(m_theta(i,j+1)), m_theta(i,j+1), (m_tillwat_flux(i,j+1) + m_excess_water(i,j+1)));
+     }
     }
     if(m_pressure_gradient(i,j-1).v < 0) { // water will flow in from the cell below
+     down = 1;
+     if (m_gradient_magnitude(i,j-1) > 0 && mask.icy(i,j-1)){
+      res_down = fabs(m_pressure_gradient(i,j-1).v) / (fabs(m_pressure_gradient(i,j-1).u) + fabs(m_pressure_gradient(i,j-1).v));
   //  m_log->message(2,"* m_pressure_gradient below (should be less than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i,j-1).u, m_excess_water(i,j-1), m_tillwat_flux(i,j-1)*m_dt);
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j-1)*m_dt + m_excess_water(i,j-1)) * fabs(sin(m_theta(i,j-1)));
+      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j-1) + m_excess_water(i,j-1))   * res_down  ;
   //    m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i,j-1));
-  //    m_log->message(2,"* answer %5i %5i %14.10f  %14.10f %14.10f %14.10f\n",i, j,  m_excess_water_playground(i,j), fabs(sin(m_theta(i,j-1))), sin(m_theta(i,j-1)), m_theta(i,j-1));
+   //   m_log->message(2,"* answer %5i %5i %14.10f  %14.10f %14.10f %14.10f \n",i, j,  fabs(sin(m_theta(i,j-1))), sin(m_theta(i,j-1)), m_theta(i,j-1), (m_tillwat_flux(i,j-1) + m_excess_water(i,j-1)));
+     }
     }
     drainage = m_excess_water_playground(i,j);
 
-   m_log->message(2,"> %5i %5i %14.10f \n", i, j, m_excess_water_playground(i,j));
-  
+   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f %2i %2i %2i %2i \n", i, j,  m_excess_water_playground(i,j), res_right, res_left, res_up, res_down, right, left, up, down);
+
+//   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f %2i %2i %2i %2i \n", i, j, m_pressure_gradient(i+1,j).u + m_pressure_gradient(i+1,j).v, m_pressure_gradient(i-1,j).u+ m_pressure_gradient(i-1,j).v, m_pressure_gradient(i,j+1).v, m_pressure_gradient(i,j+1).u + m_pressure_gradient(i,j-1).v, m_pressure_gradient(i,j-1).u+m_excess_water_playground(i,j), right, left, up, down);
+
+ //  m_log->message(2,"> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j), m_tillwat_flux(i-1,j)*m_dt, m_tillwat_flux(i,j+1)*m_dt, m_tillwat_flux(i+1,j)*m_dt, m_tillwat_flux(i,j-1)*m_dt);
+//  m_log->message(2,"a> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j)*seconds_in_year, m_tillwat_flux(i-1,j)*seconds_in_year, m_tillwat_flux(i,j+1)*seconds_in_year, m_tillwat_flux(i+1,j)*seconds_in_year, m_tillwat_flux(i,j-1)*seconds_in_year);
+//   m_log->message(2,">> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j), m_excess_water(i-1,j)*m_dt, m_excess_water(i,j-1)*m_dt, m_excess_water(i+1,j)*m_dt, m_excess_water(i,j-1)*m_dt);
+//  m_log->message(2,">> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j)*seconds_in_year, m_excess_water(i-1,j)*seconds_in_year, m_excess_water(i,j-1)*seconds_in_year, m_excess_water(i+1,j)*seconds_in_year, m_excess_water(i,j-1)*seconds_in_year);
+
    
 
    }
+*/
 
  //   m_log->message(2,"* till_drainage after: %14.10f \n", drainage);
   }
@@ -585,10 +690,24 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
 //    m_log->message(2,"gradient u and v after black hole: %12.2f %12.2f \n", result(i,j).u, result(i,j).v );
 
     result_mag(i,j) = sqrt(pow(result(i,j).u,2) + pow(result(i,j).v,2));
+
+    // test fudge
+    // 3 is stable
+    // 2 is stable
+    // 1 is stable, takes a bit longer to stabilize
+    // 0.5 takes longer to become stable, but eventually gets there
+    // 0.25 is not stable, it reaches a non-symettric state in EISMINT
+    if(result_mag(i,j) < 2.0) {
+      result_mag(i,j) = 0.0;
+    }
+
+  //  m_log->message(2,"mag_grad: %5i % 5i %12.2f %12.2f %12.2f %12.2f %12.2f \n", i, j, result_mag(i,j), m_Pover_ghosts(i-1,j), m_Pover_ghosts(i,j+1),  m_Pover_ghosts(i+1,j),  m_Pover_ghosts(i,j-1) );
 //    m_log->message(2,"gradient u and v after black hole: %12.2f %12.2f %12.2f \n", result(i,j).u, result(i,j).v, result_mag(i,j) );
     if(result_mag(i,j) > 0) {
       result_angle(i,j) = atan2 (-result(i,j).v,-result(i,j).u);
    //   m_log->message(2,"gradient u and v and direction: %5i %5i %15.10f %15.10f %15.10f \n", i, j, result(i,j).u, result(i,j).v, result_angle(i,j) );
+   
+
 
     }
     else {
@@ -596,7 +715,8 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
     }
 
    if(mask.icy(i,j)) {
-    m_log->message(2,"angle: %5i %5i %15.10f  \n", i, j, result_angle(i,j) );
+  //  m_log->message(2,"angle: %5i %5i %15.10f  \n", i, j, result_angle(i,j) );
+ //  m_log->message(2,"gradient: %5i %5i %15.10f %15.10f %15.10f %15.10f %15.10f \n", i, j, result(i,j).u, result(i,j).v, result_mag(i,j), result_angle(i,j),  m_Pover_ghosts(i,j) );
    }
 
   }
@@ -640,7 +760,7 @@ void HydrologyMod::till_drainage(IceModelVec2S &result, double dt) {
    // I'm setting it so that the rate can only be at maximum complete drainage during the time step
 
    double drainage_thickness = result(i,j) * m_dt;
-
+//   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f \n", i, j, result(i,j), drainage_thickness,  m_gradient_magnitude(i,j));
    if(mask.icy(i,j)) {
  //    m_log->message(2,"%5i %5i %14.10f %14.10f \n", i, j, result(i,j),  m_gradient_magnitude(i,j));
 
