@@ -97,6 +97,14 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
                        "m s-1", "");
   m_excess_water_playground.metadata().set_double("valid_min", 0.0);
 
+
+  m_excess_water_removed.create(m_grid, "excess_water_removed", WITHOUT_GHOSTS); 
+  m_excess_water_removed.set_attrs("internal",
+                       "extra water flux from water check",
+                       "m s-1", "");
+  m_excess_water_removed.metadata().set_double("valid_min", 0.0);
+
+
 //  m_grid->variables().add(m_excess_water);
 
   m_theta.create(m_grid, "water_flow_direction", WITH_GHOSTS,1);
@@ -227,6 +235,7 @@ void HydrologyMod::get_input_rate(double hydro_t, double hydro_dt,
     list.add(*m_inputtobed);
   }
   double input_rate;
+   //   m_log->message(2, "const_bmelt: %16.14f  \n",const_bmelt);
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
 
@@ -243,7 +252,7 @@ void HydrologyMod::get_input_rate(double hydro_t, double hydro_dt,
     }
     input_rate=result(i,j);
     if(mask.icy(i,j)){
- //   m_log->message(2, "%5i %5i %16.14f %16.14f \n", i, j, input_rate*hydro_dt, m_excess_water(i,j) );
+  //  m_log->message(2, " %5i %5i %16.14f %16.14f %16.14f %16.14f  \n", i, j, sqrt(pow(double(i-30),2)+pow(double(j-30),2)), m_bmelt_local(i,j), m_excess_water(i,j), input_rate );
    }
   }
 
@@ -337,7 +346,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 
       m_excess_water(i,j) = m_total_input(i, j);
 
-      m_log->message(2, "%5i %5i %15.10f %15.10f %15.10f \n", i, j, m_total_input(i, j), m_tillwat_flux(i,j) * m_fraction_till(i,j), flux_ratio  );
+ //     m_log->message(2, "%5i %5i %15.10f %15.10f %15.10f \n", i, j, m_total_input(i, j), m_excess_water(i,j), flux_ratio  );
 
     }
 
@@ -394,20 +403,25 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
   list.add(m_excess_water_playground);
+  list.add(m_excess_water_removed);
 
   m_excess_water.update_ghosts();
   m_theta.update_ghosts();
 
 //  m_excess_water_playground.copy_from(m_excess_water);
   m_excess_water_playground.set(0.0);
+  m_excess_water_removed.set(0.0);
   double seconds_in_year = 365*24*3600;
    m_log->message(2,"* till_drainage before: \n");
   // next find the amount of water flow into each cell from adjacent cells with the updated ghosts
   double drainage, drainage_before;
-  unsigned int left, right, up, down;
+  unsigned int left, right, up, down, topleft, topright, bottomleft, bottomright, center;
   double res_left, res_right, res_up, res_down;
-
-
+  double right_fraction, top_fraction;
+  double area, total_area, distance;
+  double  pi = 3.14159265358979323846;
+  const IceModelVec2S &thk = *m_grid->variables().get_2d_scalar("thk");
+  list.add(thk);
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
     drainage_before = m_excess_water(i,j);
@@ -415,7 +429,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 //     sediment water flux into the cell due to adjacent sediments
 
-   
+   double area_left, check1, check2, check3, area_check, area_check2;
    if(mask.icy(i,j) && m_gradient_magnitude(i,j) > 0.0) {
 
     res_left = 0.0;
@@ -427,35 +441,275 @@ void HydrologyMod::update_impl(double t, double dt) {
     right = 0;
     up = 0;
     down = 0;
+    topleft = 0;
+    topright=0;
+    bottomleft = 0;
+    bottomright = 0;
+    center = 0;
+    area_left = 0;
+    check1 = 0.0;
+    check2 = 0.0;
+    check3 = 0.0;
+    area_check = 0.0;
+    area_check2 = 0.0;
+    total_area = 0;
 
-    res_right =  fabs(m_pressure_gradient(i,j).u) / (fabs(m_pressure_gradient(i,j).u) + fabs(m_pressure_gradient(i,j).v));
-    res_up = fabs(m_pressure_gradient(i,j).v) / (fabs(m_pressure_gradient(i,j).u) + fabs(m_pressure_gradient(i,j).v));
+    // bottom right
 
-    if(m_pressure_gradient(i,j).u > 0) {
-      if(mask.icy(i-1,j)) {
-//        m_excess_water_playground(i-1,j) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_right;
-        m_excess_water_playground(i-1,j) += ( m_excess_water(i,j))  * res_right;
+    if(m_theta(i+1,j-1) > pi/2. && m_theta(i+1,j-1) < pi && mask.icy(i+1,j-1) && m_gradient_magnitude(i+1,j-1) > 0.0) {
+
+
+      res_right =  -cos(m_theta(i+1,j-1));
+      res_up = sin(m_theta(i+1,j-1));
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i+1,j-1);
+      m_excess_water_removed(i+1,j-1) += area * m_excess_water(i+1,j-1);;
+      check2 += area * m_excess_water(i+1,j-1);
+      bottomright = 1;
+      if(i+1==29 && j-1==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i+1,j-1) );
       }
-    } else {
-      if(mask.icy(i+1,j)) {
-//        m_excess_water_playground(i+1,j) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_right;
-        m_excess_water_playground(i+1,j) += ( m_excess_water(i,j))  * res_right;
+  //    m_log->message(2,"bottom_right: %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, res_right, res_up,  area, m_excess_water(i+1,j-1), m_pressure_gradient(i+1,j-1).u, m_pressure_gradient(i+1,j-1).v  );
+
+    }
+
+    // right
+
+    if(m_theta(i+1,j) < -pi/2. || m_theta(i+1,j) > pi/2. && mask.icy(i+1,j) && m_gradient_magnitude(i+1,j) > 0.0) {
+      right = 1;
+      res_right =  -cos(m_theta(i+1,j));
+      if(m_pressure_gradient(i+1,j).v < 0.) {
+        res_up = 1.0-sin(m_theta(i+1,j));
+      } else {
+        res_up = 1.0+sin(m_theta(i+1,j));
+      }
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i+1,j);
+      check1 += area * m_excess_water(i+1,j);
+      m_excess_water_removed(i+1,j) += area * m_excess_water(i+1,j);
+      if(area < 0) {
+       right = -1;
+      }
+
+      if(i+1==29 && j==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i+1,j) );
+      }
+
+    //  m_log->message(2,"right: %5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, res_right, res_up,  area, m_excess_water(i+1,j-1) );
+    }
+
+    // top right
+
+    if(m_theta(i+1,j+1) < -pi/2. &&  m_theta(i+1,j+1) > -pi && mask.icy(i+1,j+1) && m_gradient_magnitude(i+1,j+1) > 0.0) {
+      topright = 1;
+      res_right =  -cos(m_theta(i+1,j+1));
+      res_up = -sin(m_theta(i+1,j+1));
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i+1,j+1);
+      check2 += area* m_excess_water(i+1,j+1);
+      m_excess_water_removed(i+1,j+1) += area * m_excess_water(i+1,j+1);
+    //  m_log->message(2,"top_right: %5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, res_right, res_up,  area, m_excess_water(i+1,j-1) );
+      if(area < 0) {
+       topright = -1;
+      }
+
+      if(i+1==29 && j+1==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i+1,j+1) );
+      }
+    }
+
+
+    // bottom left
+
+    if(m_theta(i-1,j-1) > 0. &&  m_theta(i-1,j-1) < pi/2. && mask.icy(i-1,j-1) && m_gradient_magnitude(i-1,j-1) > 0.0) {
+      bottomleft=1;
+      res_right =  cos(m_theta(i-1,j-1));
+      res_up = sin(m_theta(i-1,j-1));
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i-1,j-1);
+      check2 += area * m_excess_water(i-1,j-1);
+      if(area < 0) {
+       bottomleft = -1;
+      }
+      m_excess_water_removed(i-1,j-1) += area * m_excess_water(i-1,j-1);
+
+      if(i-1==29 && j-1==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i-1,j-1));
+      }
+    }
+
+    // left
+
+    if(m_theta(i-1,j) > -pi/2. && m_theta(i-1,j) < pi/2. && mask.icy(i-1,j) && m_gradient_magnitude(i-1,j) > 0.0) {
+      left = 1;
+      res_right =  cos(m_theta(i-1,j));
+      if(m_pressure_gradient(i-1,j).v < 0.) {
+        res_up = 1.0-sin(m_theta(i-1,j));
+      } else  {
+        res_up = 1.0+sin(m_theta(i-1,j));
+      }
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i-1,j);
+      m_excess_water_removed(i-1,j) += area * m_excess_water(i-1,j);
+      check1 += area * m_excess_water(i-1,j);
+
+
+      if(area < 0) {
+       left = -1;
+      }
+
+      if(i-1==29 && j==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i-1,j) );
+      }
+    }
+
+    // top left
+
+    if(m_theta(i-1,j+1) < 0. &&  m_theta(i-1,j+1) > -pi/2. && mask.icy(i-1,j+1) && m_gradient_magnitude(i-1,j+1) > 0.0) {
+      topleft=1;
+      res_right =  cos(m_theta(i-1,j+1));
+      res_up = -sin(m_theta(i-1,j+1));
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i-1,j+1);
+      check2 += area * m_excess_water(i-1,j+1);
+      area_left = area;
+      m_excess_water_removed(i-1,j+1) += area * m_excess_water(i-1,j+1);
+      if(area < 0) {
+       topleft = -1;
+      }
+
+      if(i-1==29 && j+1==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i-1,j+1) );
+      }
+    }
+
+    // above
+
+    if( m_theta(i,j+1) < 0. && m_theta(i,j+1) > -pi && mask.icy(i,j+1) && m_gradient_magnitude(i,j+1) > 0.0) {
+      up = 1;
+      res_up = -sin(m_theta(i,j+1));
+      if(m_pressure_gradient(i,j+1).u < 0.) {
+        res_right = 1.0-cos(m_theta(i,j+1));
+      } else {
+        res_right = 1.0+cos(m_theta(i,j+1));
+      }
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i,j+1);
+      m_excess_water_removed(i,j+1) += area * m_excess_water(i,j+1);
+      if(area < 0) {
+       up = -1;
+      }
+      area_check = area;
+      check1 += area * m_excess_water(i,j+1);
+
+      if(i==29 && j+1==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i,j+1) );
       }
 
     }
 
-    if(m_pressure_gradient(i,j).v > 0) {
-      if(mask.icy(i,j-1)) {
-//        m_excess_water_playground(i,j-1) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_up;
-        m_excess_water_playground(i,j-1) += ( m_excess_water(i,j))  * res_up;
+
+    // below
+
+    if( m_theta(i,j-1) > 0 && m_theta(i,j-1) < pi && mask.icy(i,j-1) && m_gradient_magnitude(i,j-1) > 0.0) {
+      down=1;
+      res_up = sin(m_theta(i,j-1));
+      if(m_pressure_gradient(i,j-1).u < 0.) {
+        res_right = 1.0-cos(m_theta(i,j-1));
+      } else {
+        res_right = 1.0+cos(m_theta(i,j-1));
       }
-    } else {
-      if(mask.icy(i,j+1)) {
-//        m_excess_water_playground(i,j+1) += (m_tillwat_flux(i,j) + m_excess_water(i,j))  * res_up;
-        m_excess_water_playground(i,j+1) += ( m_excess_water(i,j))  * res_up;
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i,j-1);
+      m_excess_water_removed(i,j-1) += area* m_excess_water(i,j-1);
+      if(area < 0) {
+       down = -1;
       }
+
+      check1 += area * m_excess_water(i,j-1);
+
+      if(i==29 && j-1==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i,j-1) );
+      }
+
     }
-  }
+
+    // center
+
+  //  if (m_theta(i,j) != 0.0 && m_theta(i,j) != pi/2. && m_theta(i,j) != pi && m_theta(i,j) != -pi) {
+      center = 1;
+      res_right = 1.0-fabs(cos(m_theta(i,j)));
+      res_up = 1.0 - fabs(sin(m_theta(i,j)));
+      area = res_right * res_up;
+      total_area += area;
+      m_excess_water_playground(i,j) += area * m_excess_water(i,j);
+      m_excess_water_removed(i,j) += area * m_excess_water(i,j);
+      if(area < 0) {
+       center = -1;
+      }
+
+      if(i==29 && j==29) {
+        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i,j) );
+      }
+
+   //   check1 = total_area;
+        check3 = area * m_excess_water(i,j);
+        area_check2 = area;
+ //   }
+
+      distance = sqrt(pow(double(i-30),2)+pow(double(j-30),2));
+     if(t < 1900.0 * 365.0 * 24.0 * 3600.0) {
+      m_excess_water_playground(i,j) = 0;
+     }else{
+
+    //   if(i == 30 || j==30 || i==j){
+//m_log->message(2,"%5i %5i %2i %2i %2i %2i %2i %2i %2i %2i %2i %15.11f %15.11f %15.11f %15.11f %15.11f %15.11f  %15.11f\n", i, j, topleft, up, topright, left, center, right, bottomleft, down, bottomright, distance, check1, check2, check3, area_check,m_excess_water(i,j), m_excess_water_playground(i,j) );
+  //     }
+     }
+
+  // suspected error in the pressure gradient calculations
+// m_log->message(2,"%5i %5i %2i %2i %2i %2i %2i %2i %2i %2i %2i %15.10f %15.10f %15.10f %15.10f\n", i, j, topleft, up, topright, left, center, right, bottomleft, down, bottomright, area, check2, m_gradient_magnitude(i,j), m_excess_water_playground(i,j) );
+
+   }
+
+/*
+    if(res_right < 0) { // some water goes left
+
+      if(res_up < 0 { // some water goes down
+
+        left_fraction = 1.0 + res_right;
+        up_fraction = 1.0 + res_up;
+
+        m_excess_water_playground(i-1,j) += left_fraction* (1.0-up_fraction) * m_excess_water(i+1,j); // fraction that goes in the left cell
+        m_excess_water_playground(i-1,j-1) += left_fraction* up_fraction * m_excess_water(i+1,j); // fraction that goes in the bottom left cell
+        m_excess_water_playground(i-1,j-1) += (1.0-left_fraction)* up_fraction * m_excess_water(i+1,j); // fraction that goes in the bottom cell
+        m_excess_water_playground(i-1,j-1) += (1.0-left_fraction)* (1.0-up_fraction) * m_excess_water(i+1,j); // portion that remains in this cell
+
+      } else { // some water goes up
+
+      }
+
+    } else { // some water goes right
+
+
+      if(res_up < 0 { // some water goes down
+
+      } else { // some water goes up
+
+      }
+
+    }
+*/
+
+
 
 /*
  //   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water(i+1,j), m_excess_water(i-1,j), m_excess_water(i,j+1),  m_excess_water(i,j-1) );
@@ -522,6 +776,18 @@ void HydrologyMod::update_impl(double t, double dt) {
 */
 
  //   m_log->message(2,"* till_drainage after: %14.10f \n", drainage);
+  }
+
+
+  if(t >= 1900.0 * 365.0 * 24.0 * 3600.0){
+   m_log->message(2,"> %15.10f\n", t  / 365 / 24 / 3600);
+  for (Points p(*m_grid); p; p.next()) {
+    const int i = p.i(), j = p.j();
+    if(mask.icy(i,j)){
+  //    m_log->message(2,"%5i %5i %15.10f %15.10f %15.10f\n", i, j, m_excess_water(i,j), m_excess_water_removed(i,j), m_excess_water_playground(i,j) );
+    }
+
+  }
   }
 
   m_excess_water.copy_from(m_excess_water_playground);
@@ -626,18 +892,36 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
   for (Points p(*m_grid); p; p.next()) {										
     const int i = p.i(), j = p.j();
 
-    if (mask.icy(i, j)){
+
+    // I think I need to change the gradient calculation
+       
+
+    if (mask.icy(i, j) && (m_Pover_ghosts(i+1,j+1) > m_Pover_ghosts(i,j) ||
+       m_Pover_ghosts(i,j+1) > m_Pover_ghosts(i,j) ||
+       m_Pover_ghosts(i-1,j+1) > m_Pover_ghosts(i,j) ||
+       m_Pover_ghosts(i+1,j) > m_Pover_ghosts(i,j) ||
+       m_Pover_ghosts(i-1,j) > m_Pover_ghosts(i,j) ||
+       m_Pover_ghosts(i+1,j-1) > m_Pover_ghosts(i,j) ||
+       m_Pover_ghosts(i,j-1) > m_Pover_ghosts(i,j) ||
+       m_Pover_ghosts(i-1,j-1) > m_Pover_ghosts(i,j))){
       result(i,j).u = ((m_Pover_ghosts(i+1,j+1) + 2.0 * m_Pover_ghosts(i+1,j) + m_Pover_ghosts(i+1,j-1)) -
 			    (m_Pover_ghosts(i-1,j+1) + 2.0 * m_Pover_ghosts(i-1,j) + m_Pover_ghosts(i-1,j-1))) / (8.0 * dx);
-  //    m_log->message(2,"* >\n" );
-  //    m_log->message(2,"%12.2f %12.2f %12.2f \n", m_Pover_ghosts(i+1,j+1), m_Pover_ghosts(i,j+1), m_Pover_ghosts(i-1,j+1));
-  //    m_log->message(2,"%12.2f %12.2f %12.2f \n", m_Pover_ghosts(i+1,j), m_Pover_ghosts(i,j), m_Pover_ghosts(i-1,j));
-  //    m_log->message(2,"%12.2f %12.2f %12.2f \n", m_Pover_ghosts(i+1,j-1), m_Pover_ghosts(i,j-1), m_Pover_ghosts(i-1,j-1));
-
+  //
+/*
+      if((i== 30 || i==29) && j==28){
+      m_log->message(2,"> %5i %5i %5i\n", i-1, i, i+1 );
+      m_log->message(2,"%5i %12.2f %12.2f %12.2f \n",j+1, m_Pover_ghosts(i-1,j+1), m_Pover_ghosts(i,j+1), m_Pover_ghosts(i+1,j+1));
+      m_log->message(2,"%5i %12.2f %12.2f %12.2f \n",j, m_Pover_ghosts(i-1,j), m_Pover_ghosts(i,j), m_Pover_ghosts(i-1,j));
+      m_log->message(2,"%5i %12.2f %12.2f %12.2f \n",j-1, m_Pover_ghosts(i-1,j-1), m_Pover_ghosts(i,j-1), m_Pover_ghosts(i+1,j-1));
+      }
+*/
       result(i,j).v = ((m_Pover_ghosts(i+1,j+1) + 2.0 * m_Pover_ghosts(i,j+1) + m_Pover_ghosts(i-1,j+1)) -
 			    (m_Pover_ghosts(i+1,j-1) + 2.0 * m_Pover_ghosts(i,j-1) + m_Pover_ghosts(i-1,j-1))) / (8.0 * dy);
 
 //      m_log->message(2,"gradient u and v: %5i %5i %12.2f %12.2f \n", i, j, result(i,j).u, result(i,j).v );
+
+     
+
     } else {
       result(i,j).u = 0.0;
 
@@ -655,12 +939,12 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
   // After, the magnitude of the gradient is calculated. Also, the direction of water flow is calculated.
 
   result.update_ghosts();
-
+  double mag_before;
   for (Points p(*m_grid); p; p.next()) {										
     const int i = p.i(), j = p.j();
 
   //  m_log->message(2,"gradient u and v before black hole: %12.2f %12.2f \n", result(i,j).u, result(i,j).v );
-
+    mag_before = sqrt(pow(result(i,j).u,2) + pow(result(i,j).v,2));
     // remembering that the gradient will point in the opposite direction of flow
     if( result(i,j).u < 0 && result(i+1,j).u > 0) {
       if(abs(result(i,j).u) < abs(result(i+1,j).u)) {
@@ -690,6 +974,9 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
 //    m_log->message(2,"gradient u and v after black hole: %12.2f %12.2f \n", result(i,j).u, result(i,j).v );
 
     result_mag(i,j) = sqrt(pow(result(i,j).u,2) + pow(result(i,j).v,2));
+    if(mask.icy(i,j)){
+  //  m_log->message(2,"%5i %5i %15.10f %15.10f %15.10f \n", i, j,  mag_before, result_mag(i,j),  mag_before-result_mag(i,j));
+    }
 
     // test fudge
     // 3 is stable
@@ -697,9 +984,11 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
     // 1 is stable, takes a bit longer to stabilize
     // 0.5 takes longer to become stable, but eventually gets there
     // 0.25 is not stable, it reaches a non-symettric state in EISMINT
-    if(result_mag(i,j) < 2.0) {
+/*
+    if(result_mag(i,j) < 2) {
       result_mag(i,j) = 0.0;
     }
+*/
 
   //  m_log->message(2,"mag_grad: %5i % 5i %12.2f %12.2f %12.2f %12.2f %12.2f \n", i, j, result_mag(i,j), m_Pover_ghosts(i-1,j), m_Pover_ghosts(i,j+1),  m_Pover_ghosts(i+1,j),  m_Pover_ghosts(i,j-1) );
 //    m_log->message(2,"gradient u and v after black hole: %12.2f %12.2f %12.2f \n", result(i,j).u, result(i,j).v, result_mag(i,j) );
@@ -711,7 +1000,7 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
 
     }
     else {
-      result_angle(i,j) = 0;
+      result_angle(i,j) = 4.0;
     }
 
    if(mask.icy(i,j)) {
