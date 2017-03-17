@@ -55,6 +55,7 @@ public:
 
 protected:
   IceModelVec2S m_fraction_till, m_fraction_channel, m_Pover_ghosts, m_gradient_magnitude, m_tillwat_flux, m_excess_water, m_till_permeability;
+
   IceModelVec2V m_pressure_gradient;
   virtual void get_input_rate(double hydro_t, double hydro_dt, IceModelVec2S &result);
   virtual void update_impl(double t, double dt);
@@ -70,9 +71,40 @@ protected:
   virtual MaxTimestep max_timestep_impl(double t) const;
 
 private:
-  IceModelVec2S m_theta, m_excess_water_playground,  m_excess_water_removed; 
+  IceModelVec2S m_theta, m_excess_water_playground,  m_excess_water_removed, quad_area; 
+  IceModelVec2V bottom_left, top_left, bottom_right, top_right;
 
 };
+
+// linked list for creating a polygon
+// I used this nice tutorial as a basis for this code: http://pumpkinprogrammer.com/2014/06/13/c-tutorial-intro-to-linked-lists/
+
+struct node
+{
+    double x;
+    double y;
+    bool inside;
+    int shared_node_number;
+    node * next;
+};
+
+
+class polygon_linked_list{
+
+public:
+
+   polygon_linked_list(); // constructor
+   ~polygon_linked_list(); // destructor
+   void insertNode( node * newNode, int position );
+   removeNode( int position );
+
+private:
+    // Head of the list contains no song data, 
+    // but points to the song playlist.
+    node * head;
+    int listLength;
+
+}
 
 } // end namespace hydrology
 

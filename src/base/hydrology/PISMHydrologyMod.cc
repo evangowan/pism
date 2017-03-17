@@ -31,6 +31,7 @@
 #include "base/util/IceModelVec2CellType.hh"
 #include <math.h>
 #include <stdlib.h>
+#include <algorithm>    // std::min, max
 
 namespace pism {
 namespace hydrology {
@@ -103,6 +104,36 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
                        "extra water flux from water check",
                        "m s-1", "");
   m_excess_water_removed.metadata().set_double("valid_min", 0.0);
+
+
+
+  bottom_left.create(m_grid, "translate_bottom_left", WITH_GHOSTS); 
+  bottom_left.set_attrs("internal",
+                       "translation of bottom left corner of the grid cell",
+                       "1", "");
+
+
+  bottom_right.create(m_grid, "translate_bottom_right", WITH_GHOSTS); 
+  bottom_right.set_attrs("internal",
+                       "translation of bottom right corner of the grid cell",
+                       "1", "");
+
+
+  top_left.create(m_grid, "translate_top_left", WITH_GHOSTS); 
+  top_left.set_attrs("internal",
+                       "translation of top left corner of the grid cell",
+                       "1", "");
+
+
+  top_right.create(m_grid, "translate_top_right", WITH_GHOSTS); 
+  top_right.set_attrs("internal",
+                       "translation of top right corner of the grid cell",
+                       "1", "");
+
+  quad_area.create(m_grid, "quad_area", WITH_GHOSTS); 
+  quad_area.set_attrs("internal",
+                       "area of the quadralateral from the translated grid cell",
+                       "1", "");
 
 
 //  m_grid->variables().add(m_excess_water);
@@ -415,379 +446,154 @@ void HydrologyMod::update_impl(double t, double dt) {
    m_log->message(2,"* till_drainage before: \n");
   // next find the amount of water flow into each cell from adjacent cells with the updated ghosts
   double drainage, drainage_before;
-  unsigned int left, right, up, down, topleft, topright, bottomleft, bottomright, center;
+  double left, right, up, down, topleft, topright, bottomleft, bottomright, center;
   double res_left, res_right, res_up, res_down;
   double right_fraction, top_fraction;
   double area, total_area, distance;
   double  pi = 3.14159265358979323846;
+
+  double translate_center[3][3][2];
+
+  int x_counter, y_counter;
+
+  double quadrilateral[4][2];
+
+  double a_x, a_y, b_x, b_y;
+
   const IceModelVec2S &thk = *m_grid->variables().get_2d_scalar("thk");
   list.add(thk);
+
+
+  // calculate the translation of the grid cell's corders, to determine water content to surrounding cells
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
-    drainage_before = m_excess_water(i,j);
- //  m_log->message(2,"* till_drainage before: %14.10f \n", drainage_before);
 
-//     sediment water flux into the cell due to adjacent sediments
+   if(mask.icy(i,j) ) {
 
-   double area_left, check1, check2, check3, area_check, area_check2;
-   if(mask.icy(i,j) && m_gradient_magnitude(i,j) > 0.0) {
+    // first find the translation of the center of all the cells
 
-    res_left = 0.0;
-    res_right = 0.0;
-    res_up = 0.0;
-    res_down = 0.0;
+    for(x_counter=0; x_counter<3; x_counter++; ){
+      for(y_counter=0; y_counter<3; y_counter++; ){ 
 
-    left = 0;
-    right = 0;
-    up = 0;
-    down = 0;
-    topleft = 0;
-    topright=0;
-    bottomleft = 0;
-    bottomright = 0;
-    center = 0;
-    area_left = 0;
-    check1 = 0.0;
-    check2 = 0.0;
-    check3 = 0.0;
-    area_check = 0.0;
-    area_check2 = 0.0;
-    total_area = 0;
+        translate_center[x_counter][y_counter][0] = cos(m_theta(i-x_counter-1,j-y_counter-1)); // translate x
+        translate_center[x_counter][y_counter][1] = sin(m_theta(i-x_counter-1,j-y_counter-1)); // translate y
 
-    // bottom right
-
-    if(m_theta(i+1,j-1) > pi/2. && m_theta(i+1,j-1) < pi && mask.icy(i+1,j-1) && m_gradient_magnitude(i+1,j-1) > 0.0) {
-
-
-      res_right =  -cos(m_theta(i+1,j-1));
-      res_up = sin(m_theta(i+1,j-1));
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i+1,j-1);
-      m_excess_water_removed(i+1,j-1) += area * m_excess_water(i+1,j-1);;
-      check2 += area * m_excess_water(i+1,j-1);
-      bottomright = 1;
-      if(i+1==29 && j-1==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i+1,j-1) );
-      }
-  //    m_log->message(2,"bottom_right: %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, res_right, res_up,  area, m_excess_water(i+1,j-1), m_pressure_gradient(i+1,j-1).u, m_pressure_gradient(i+1,j-1).v  );
-
-    }
-
-    // right
-
-    if(m_theta(i+1,j) < -pi/2. || m_theta(i+1,j) > pi/2. && mask.icy(i+1,j) && m_gradient_magnitude(i+1,j) > 0.0) {
-      right = 1;
-      res_right =  -cos(m_theta(i+1,j));
-      if(m_pressure_gradient(i+1,j).v < 0.) {
-        res_up = 1.0-sin(m_theta(i+1,j));
-      } else {
-        res_up = 1.0+sin(m_theta(i+1,j));
-      }
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i+1,j);
-      check1 += area * m_excess_water(i+1,j);
-      m_excess_water_removed(i+1,j) += area * m_excess_water(i+1,j);
-      if(area < 0) {
-       right = -1;
-      }
-
-      if(i+1==29 && j==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i+1,j) );
-      }
-
-    //  m_log->message(2,"right: %5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, res_right, res_up,  area, m_excess_water(i+1,j-1) );
-    }
-
-    // top right
-
-    if(m_theta(i+1,j+1) < -pi/2. &&  m_theta(i+1,j+1) > -pi && mask.icy(i+1,j+1) && m_gradient_magnitude(i+1,j+1) > 0.0) {
-      topright = 1;
-      res_right =  -cos(m_theta(i+1,j+1));
-      res_up = -sin(m_theta(i+1,j+1));
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i+1,j+1);
-      check2 += area* m_excess_water(i+1,j+1);
-      m_excess_water_removed(i+1,j+1) += area * m_excess_water(i+1,j+1);
-    //  m_log->message(2,"top_right: %5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, res_right, res_up,  area, m_excess_water(i+1,j-1) );
-      if(area < 0) {
-       topright = -1;
-      }
-
-      if(i+1==29 && j+1==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i+1,j+1) );
       }
     }
-
 
     // bottom left
 
-    if(m_theta(i-1,j-1) > 0. &&  m_theta(i-1,j-1) < pi/2. && mask.icy(i-1,j-1) && m_gradient_magnitude(i-1,j-1) > 0.0) {
-      bottomleft=1;
-      res_right =  cos(m_theta(i-1,j-1));
-      res_up = sin(m_theta(i-1,j-1));
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i-1,j-1);
-      check2 += area * m_excess_water(i-1,j-1);
-      if(area < 0) {
-       bottomleft = -1;
-      }
-      m_excess_water_removed(i-1,j-1) += area * m_excess_water(i-1,j-1);
-
-      if(i-1==29 && j-1==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i-1,j-1));
-      }
-    }
-
-    // left
-
-    if(m_theta(i-1,j) > -pi/2. && m_theta(i-1,j) < pi/2. && mask.icy(i-1,j) && m_gradient_magnitude(i-1,j) > 0.0) {
-      left = 1;
-      res_right =  cos(m_theta(i-1,j));
-      if(m_pressure_gradient(i-1,j).v < 0.) {
-        res_up = 1.0-sin(m_theta(i-1,j));
-      } else  {
-        res_up = 1.0+sin(m_theta(i-1,j));
-      }
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i-1,j);
-      m_excess_water_removed(i-1,j) += area * m_excess_water(i-1,j);
-      check1 += area * m_excess_water(i-1,j);
-
-
-      if(area < 0) {
-       left = -1;
-      }
-
-      if(i-1==29 && j==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i-1,j) );
-      }
-    }
+    bottom_left(i,j).u = ((translate_center[1][1][0] + translate_center[0][1][0]) / 2.0 + (translate_center[1][0][0] + translate_center[0][0][0]) / 2.0) / 2.0;
+    bottom_left(i,j).v = ((translate_center[1][1][1] + translate_center[0][1][1]) / 2.0 + (translate_center[1][0][1] + translate_center[0][0][1]) / 2.0) / 2.0;
+    quadrilateral[0][0] = bottom_left(i,j).u;
+    quadrilateral[0][1] = bottom_left(i,j).v;
 
     // top left
 
-    if(m_theta(i-1,j+1) < 0. &&  m_theta(i-1,j+1) > -pi/2. && mask.icy(i-1,j+1) && m_gradient_magnitude(i-1,j+1) > 0.0) {
-      topleft=1;
-      res_right =  cos(m_theta(i-1,j+1));
-      res_up = -sin(m_theta(i-1,j+1));
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i-1,j+1);
-      check2 += area * m_excess_water(i-1,j+1);
-      area_left = area;
-      m_excess_water_removed(i-1,j+1) += area * m_excess_water(i-1,j+1);
-      if(area < 0) {
-       topleft = -1;
-      }
+    top_left(i,j).u = ((translate_center[1][1][0] + translate_center[0][1][0]) / 2.0 + (translate_center[1][2][0] + translate_center[0][2][0]) / 2.0) / 2.0;
+    top_left(i,j).v = ((translate_center[1][1][1] + translate_center[0][1][1]) / 2.0 + (translate_center[1][2][1] + translate_center[0][2][1]) / 2.0) / 2.0;
+    quadrilateral[1][0] = top_left(i,j).u;
+    quadrilateral[1][1] = top_left(i,j).v;
 
-      if(i-1==29 && j+1==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i-1,j+1) );
-      }
-    }
+    // top right
 
-    // above
-
-    if( m_theta(i,j+1) < 0. && m_theta(i,j+1) > -pi && mask.icy(i,j+1) && m_gradient_magnitude(i,j+1) > 0.0) {
-      up = 1;
-      res_up = -sin(m_theta(i,j+1));
-      if(m_pressure_gradient(i,j+1).u < 0.) {
-        res_right = 1.0-cos(m_theta(i,j+1));
-      } else {
-        res_right = 1.0+cos(m_theta(i,j+1));
-      }
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i,j+1);
-      m_excess_water_removed(i,j+1) += area * m_excess_water(i,j+1);
-      if(area < 0) {
-       up = -1;
-      }
-      area_check = area;
-      check1 += area * m_excess_water(i,j+1);
-
-      if(i==29 && j+1==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i,j+1) );
-      }
-
-    }
+    top_right(i,j).u = ((translate_center[1][1][0] + translate_center[2][1][0]) / 2.0 + (translate_center[1][2][0] + translate_center[2][2][0]) / 2.0) / 2.0;
+    top_right(i,j).v = ((translate_center[1][1][1] + translate_center[2][1][1]) / 2.0 + (translate_center[1][2][1] + translate_center[2][2][1]) / 2.0) / 2.0;
+    quadrilateral[2][0] = top_right(i,j).u;
+    quadrilateral[2][1] = top_right(i,j).v;
 
 
-    // below
+    // bottom right
 
-    if( m_theta(i,j-1) > 0 && m_theta(i,j-1) < pi && mask.icy(i,j-1) && m_gradient_magnitude(i,j-1) > 0.0) {
-      down=1;
-      res_up = sin(m_theta(i,j-1));
-      if(m_pressure_gradient(i,j-1).u < 0.) {
-        res_right = 1.0-cos(m_theta(i,j-1));
-      } else {
-        res_right = 1.0+cos(m_theta(i,j-1));
-      }
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i,j-1);
-      m_excess_water_removed(i,j-1) += area* m_excess_water(i,j-1);
-      if(area < 0) {
-       down = -1;
-      }
-
-      check1 += area * m_excess_water(i,j-1);
-
-      if(i==29 && j-1==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i,j-1) );
-      }
-
-    }
-
-    // center
-
-  //  if (m_theta(i,j) != 0.0 && m_theta(i,j) != pi/2. && m_theta(i,j) != pi && m_theta(i,j) != -pi) {
-      center = 1;
-      res_right = 1.0-fabs(cos(m_theta(i,j)));
-      res_up = 1.0 - fabs(sin(m_theta(i,j)));
-      area = res_right * res_up;
-      total_area += area;
-      m_excess_water_playground(i,j) += area * m_excess_water(i,j);
-      m_excess_water_removed(i,j) += area * m_excess_water(i,j);
-      if(area < 0) {
-       center = -1;
-      }
-
-      if(i==29 && j==29) {
-        m_log->message(2,"%5i %5i %15.11f\n", i, j, area * m_excess_water(i,j) );
-      }
-
-   //   check1 = total_area;
-        check3 = area * m_excess_water(i,j);
-        area_check2 = area;
- //   }
-
-      distance = sqrt(pow(double(i-30),2)+pow(double(j-30),2));
-     if(t < 1900.0 * 365.0 * 24.0 * 3600.0) {
-      m_excess_water_playground(i,j) = 0;
-     }else{
-
-    //   if(i == 30 || j==30 || i==j){
-//m_log->message(2,"%5i %5i %2i %2i %2i %2i %2i %2i %2i %2i %2i %15.11f %15.11f %15.11f %15.11f %15.11f %15.11f  %15.11f\n", i, j, topleft, up, topright, left, center, right, bottomleft, down, bottomright, distance, check1, check2, check3, area_check,m_excess_water(i,j), m_excess_water_playground(i,j) );
-  //     }
-     }
-
-  // suspected error in the pressure gradient calculations
-// m_log->message(2,"%5i %5i %2i %2i %2i %2i %2i %2i %2i %2i %2i %15.10f %15.10f %15.10f %15.10f\n", i, j, topleft, up, topright, left, center, right, bottomleft, down, bottomright, area, check2, m_gradient_magnitude(i,j), m_excess_water_playground(i,j) );
-
-   }
-
-/*
-    if(res_right < 0) { // some water goes left
-
-      if(res_up < 0 { // some water goes down
-
-        left_fraction = 1.0 + res_right;
-        up_fraction = 1.0 + res_up;
-
-        m_excess_water_playground(i-1,j) += left_fraction* (1.0-up_fraction) * m_excess_water(i+1,j); // fraction that goes in the left cell
-        m_excess_water_playground(i-1,j-1) += left_fraction* up_fraction * m_excess_water(i+1,j); // fraction that goes in the bottom left cell
-        m_excess_water_playground(i-1,j-1) += (1.0-left_fraction)* up_fraction * m_excess_water(i+1,j); // fraction that goes in the bottom cell
-        m_excess_water_playground(i-1,j-1) += (1.0-left_fraction)* (1.0-up_fraction) * m_excess_water(i+1,j); // portion that remains in this cell
-
-      } else { // some water goes up
-
-      }
-
-    } else { // some water goes right
-
-
-      if(res_up < 0 { // some water goes down
-
-      } else { // some water goes up
-
-      }
-
-    }
-*/
+    bottom_right(i,j).u = ((translate_center[1][1][0] + translate_center[2][1][0]) / 2.0 + (translate_center[1][0][0] + translate_center[2][0][0]) / 2.0) / 2.0;
+    bottom_right(i,j).v = ((translate_center[1][1][1] + translate_center[2][1][1]) / 2.0 + (translate_center[1][0][1] + translate_center[2][0][1]) / 2.0) / 2.0;
+    quadrilateral[3][0] = bottom_right(i,j).u;
+    quadrilateral[3][1] = bottom_right(i,j).v;
 
 
 
-/*
- //   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water(i+1,j), m_excess_water(i-1,j), m_excess_water(i,j+1),  m_excess_water(i,j-1) );
- //  m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f \n", i, j, m_pressure_gradient(i+1,j).u, m_pressure_gradient(i-1,j).u, m_pressure_gradient(i,j+1).v, m_pressure_gradient(i,j-1).v );
 
-    if(m_pressure_gradient(i+1,j).u > 0) { // water will flow in from the right cell
-  //    m_log->message(2,"* m_pressure_gradient right (should be greater than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i+1,j).u, m_excess_water(i+1,j), m_tillwat_flux(i+1,j)*m_dt);
-     right = 1;
-     if (m_gradient_magnitude(i+1,j) > 0 && mask.icy(i+1,j)){
-      res_right =  fabs(m_pressure_gradient(i+1,j).u) / (fabs(m_pressure_gradient(i+1,j).u) + fabs(m_pressure_gradient(i+1,j).v));
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i+1,j) + m_excess_water(i+1,j))  * res_right;
-  //    m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f  \n",i, j, fabs(cos(m_theta(i+1,j))), cos(m_theta(i+1,j)), m_theta(i+1,j),(m_tillwat_flux(i+1,j) + m_excess_water(i+1,j)) );
-   //   m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  m_excess_water_playground(i,j), fabs(cos(m_theta(i+1,j))), cos(m_theta(i+1,j)), m_theta(i+1,j));
-     }
-    }
 
-    if(m_pressure_gradient(i-1,j).u < 0) { // water will flow in from the left cell
 
-     left = 1;
-     if (m_gradient_magnitude(i-1,j) > 0 && mask.icy(i-1,j)){
-      res_left = fabs(m_pressure_gradient(i-1,j).u) / (fabs(m_pressure_gradient(i-1,j).u) + fabs(m_pressure_gradient(i-1,j).v));
-   // m_log->message(2,"* m_pressure_gradient left (should be less than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i-1,j).u, m_excess_water(i-1,j), m_tillwat_flux(i-1,j)*m_dt);
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i-1,j) + m_excess_water(i-1,j)) *  res_left ;
-   //   m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i-1,j));
-//      m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,   fabs(cos(m_theta(i-1,j))), cos(m_theta(i-1,j)), m_theta(i-1,j), (m_tillwat_flux(i-1,j) + m_excess_water(i-1,j)));
-     }
+    // TODO a check to make sure the translated quadralateral is regular? Probably shouldn't happen if the gradient is calculated correctly.
 
-    }
 
-    if(m_pressure_gradient(i,j+1).v > 0) { // water will flow in from the cell above
-     up = 1;
-     if (m_gradient_magnitude(i,j+1) > 0 && mask.icy(i,j+1)){
-      res_up = fabs(m_pressure_gradient(i,j+1).v) / (fabs(m_pressure_gradient(i,j+1).u) + fabs(m_pressure_gradient(i,j+1).v));
-//    m_log->message(2,"* m_pressure_gradient above (should be greater than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i,j+1).u, m_excess_water(i,j+1), m_tillwat_flux(i,j+1)*m_dt);
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j+1) + m_excess_water(i,j+1))  * res_up  ;
-   //   m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i,j+1));
-  //    m_log->message(2,"* answer %5i %5i %14.10f %14.10f %14.10f %14.10f \n",i, j,  fabs(sin(m_theta(i,j+1))), sin(m_theta(i,j+1)), m_theta(i,j+1), (m_tillwat_flux(i,j+1) + m_excess_water(i,j+1)));
-     }
-    }
-    if(m_pressure_gradient(i,j-1).v < 0) { // water will flow in from the cell below
-     down = 1;
-     if (m_gradient_magnitude(i,j-1) > 0 && mask.icy(i,j-1)){
-      res_down = fabs(m_pressure_gradient(i,j-1).v) / (fabs(m_pressure_gradient(i,j-1).u) + fabs(m_pressure_gradient(i,j-1).v));
-  //  m_log->message(2,"* m_pressure_gradient below (should be less than zero): %5i %5i %14.10f %14.10f %15.10f \n",i, j,  m_pressure_gradient(i,j-1).u, m_excess_water(i,j-1), m_tillwat_flux(i,j-1)*m_dt);
-      m_excess_water_playground(i,j) += (m_tillwat_flux(i,j-1) + m_excess_water(i,j-1))   * res_down  ;
-  //    m_log->message(2,"* theta %5i %5i %14.10f  \n",i, j, m_theta(i,j-1));
-   //   m_log->message(2,"* answer %5i %5i %14.10f  %14.10f %14.10f %14.10f \n",i, j,  fabs(sin(m_theta(i,j-1))), sin(m_theta(i,j-1)), m_theta(i,j-1), (m_tillwat_flux(i,j-1) + m_excess_water(i,j-1)));
-     }
-    }
-    drainage = m_excess_water_playground(i,j);
+    // find the area of the quadralateral
 
-   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f %2i %2i %2i %2i \n", i, j,  m_excess_water_playground(i,j), res_right, res_left, res_up, res_down, right, left, up, down);
+    quad_area(i,j) = find_quad_area(quadrilateral);
 
-//   m_log->message(2,"%5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f %2i %2i %2i %2i \n", i, j, m_pressure_gradient(i+1,j).u + m_pressure_gradient(i+1,j).v, m_pressure_gradient(i-1,j).u+ m_pressure_gradient(i-1,j).v, m_pressure_gradient(i,j+1).v, m_pressure_gradient(i,j+1).u + m_pressure_gradient(i,j-1).v, m_pressure_gradient(i,j-1).u+m_excess_water_playground(i,j), right, left, up, down);
+  } else {
 
- //  m_log->message(2,"> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j), m_tillwat_flux(i-1,j)*m_dt, m_tillwat_flux(i,j+1)*m_dt, m_tillwat_flux(i+1,j)*m_dt, m_tillwat_flux(i,j-1)*m_dt);
-//  m_log->message(2,"a> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j)*seconds_in_year, m_tillwat_flux(i-1,j)*seconds_in_year, m_tillwat_flux(i,j+1)*seconds_in_year, m_tillwat_flux(i+1,j)*seconds_in_year, m_tillwat_flux(i,j-1)*seconds_in_year);
-//   m_log->message(2,">> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j), m_excess_water(i-1,j)*m_dt, m_excess_water(i,j-1)*m_dt, m_excess_water(i+1,j)*m_dt, m_excess_water(i,j-1)*m_dt);
-//  m_log->message(2,">> %5i %5i %14.10f %14.10f %14.10f %14.10f %14.10f \n", i, j, m_excess_water_playground(i,j)*seconds_in_year, m_excess_water(i-1,j)*seconds_in_year, m_excess_water(i,j-1)*seconds_in_year, m_excess_water(i+1,j)*seconds_in_year, m_excess_water(i,j-1)*seconds_in_year);
+    // bottom right
 
-   
+    bottom_right(i,j).u = 0.5;
+    bottom_right(i,j).v = -0.5;
 
-   }
-*/
+    // bottom left
 
- //   m_log->message(2,"* till_drainage after: %14.10f \n", drainage);
+    bottom_left(i,j).u = -0.5;
+    bottom_left(i,j).v = -0.5;
+
+
+    // top right
+
+    top_right(i,j).u = 0.5;
+    top_right(i,j).v = 0.5;
+
+
+    // top left
+
+    top_left(i,j).u = -0.5;
+    top_left(i,j).v = 0.5;
+
+    quad_area(i,j) = 1;
+
+ 
   }
 
+  // now that we know where the water spreads to, find how much goes into each cell
 
-  if(t >= 1900.0 * 365.0 * 24.0 * 3600.0){
-   m_log->message(2,"> %15.10f\n", t  / 365 / 24 / 3600);
+  // first update the ghosts
+
+  top_left.update_ghosts();
+  top_right.update_ghosts();
+  bottom_left.update_ghosts();
+  bottom_right.update_ghosts();
+  quad_area.update_ghosts();
+  
+  double[4][2] reference_cell, compare_cell;
+
+  reference_cell[0][0] = -0.5; // bottom left
+  reference_cell[0][1] = -0.5;
+  reference_cell[1][0] = -0.5; // top left
+  reference_cell[1][1] =  0.5;
+  reference_cell[2][0] =  0.5; // top right
+  reference_cell[2][1] =  0.5;
+  reference_cell[3][0] =  0.5; // bottom right
+  reference_cell[3][1] = -0.5;
+
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
-    if(mask.icy(i,j)){
-  //    m_log->message(2,"%5i %5i %15.10f %15.10f %15.10f\n", i, j, m_excess_water(i,j), m_excess_water_removed(i,j), m_excess_water_playground(i,j) );
-    }
 
-  }
+   if(mask.icy(i,j) ) {
+
+    // make a call to the formula 
+    for(x_counter=0; x_counter<3; x_counter++; ){
+      for(y_counter=0; y_counter<3; y_counter++; ){ 
+
+        compare_cell[0][0] = double(x_counter-1) + bottom_left(i,j).u; // bottom left
+        compare_cell[0][1] = double(y_counter-1) + bottom_left(i,j).v; 
+        compare_cell[1][0] = double(x_counter-1) + top_left(i,j).u; // top left
+        compare_cell[1][1] = double(y_counter-1) + top_left(i,j).v;
+        compare_cell[2][0] = double(x_counter-1) + top_right(i,j).u; // top right
+        compare_cell[2][1] = double(y_counter-1) + top_right(i,j).v; 
+        compare_cell[3][0] = double(x_counter-1) + bottom_right(i,j).u; // bottom right
+        compare_cell[3][1] = double(y_counter-1) + bottom_right(i,j).v;
+
+        m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
+
+      }
+    }
   }
 
   m_excess_water.copy_from(m_excess_water_playground);
@@ -797,6 +603,374 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 }
 
+double find_quad_area(double quadrilateral[4][2]) {
+
+
+  double a_x = quadrilateral[0][0] - quadrilateral[2][0];
+  double a_y = quadrilateral[0][1] - quadrilateral[2][1];
+  double b_x = quadrilateral[1][0] - quadrilateral[3][0];
+  double b_y = quadrilateral[1][1] - quadrilateral[3][1]; 
+
+  return sqrt(a_x*b_y - a_y*b_y) * 0.5;
+
+}
+
+double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
+
+  bool corner_inside1[4], corner_inside2[4];
+
+  int counter;
+
+  int polygon_size = 4;
+
+  bool all_inside = true;
+  bool all_outside = true;
+
+  bool all_inside2 = true;
+  bool all_outside2 = true;
+
+  double water;
+
+  polygon_linked_list reference;
+  polygon_linked_list compare;
+  
+  int reference_node_count = 0;
+  int compare_node_count = 0;
+
+  node * reference_node = new node;
+  node * reference_node2 = new node;
+  node * compare_node = new node;
+  node * compare_node2 = new node;
+
+  bool on_edge = true; // used in point_in_polygon to check if the point is on the edge of the reference polygon
+
+  for(counter = 0; counter < polygon_size; counter++) {
+
+    // check if reference corner is inside the reference
+    corner_inside1[counter] = point_in_polygon(compare_cell, polygon_size, reference_cell[counter][0], reference_cell[counter][1], on_edge);
+    corner_inside2[counter] = point_in_polygon(reference_cell, polygon_size, compare_cell[counter][0], compare_cell[counter][1], on_edge);
+
+    
+    reference_node -> x = reference_cell[counter][0];
+    reference_node -> y = reference_cell[counter][1];
+    reference_node -> shared_node_number = 0;
+    reference_node -> inside = corner_inside1[counter];
+
+    reference.insertNode(reference_node,counter+1);
+    reference_node_count++;
+
+
+    compare_node -> x = compare[counter][0];
+    compare_node -> y = compare[counter][1];
+    reference_node -> shared_node_number = 0;
+    compare_node -> inside = corner_inside2[counter];
+
+    compare.insertNode(compare_node,counter+1);
+    compare_node_count++;
+
+    if(counter == 0) {  // create a full polygon this way 
+
+      reference.insertNode(reference_node,2);
+      reference_node_count++;
+      compare.insertNode(compare_node,2);
+      compare_node_count++;
+
+    }
+
+
+    if(corner_inside1[counter] || corner_inside2[counter]) {
+      all_outside = false;
+    }
+
+    if(!corner_inside1[counter]) {
+
+      all_inside1 = false;
+
+    }
+
+    if(!corner_inside2[counter]) {
+
+      all_inside2 = false;
+
+    }
+
+  }
+
+  // find the crossover points
+ 
+  // go back to the head
+
+
+  bool not_finished = true;
+  bool not_finished2;
+  bool is_crossover;
+
+  int reference_point = 1;
+  int compare_point;
+
+  int shared_node_number = 0;
+
+  node * crossover_node = new node;
+
+  while (not_finished) {
+
+   not_finished = reference.findNode(reference_node,reference_point);
+
+   if (not_finished) {
+
+    not_finished = reference.findNode(reference_node2,reference_point+1);
+
+    if (not_finished) {
+
+     // This should have found the reference line segement, now find crossover points with the compare polygon
+
+     not_finished2 = true;
+     compare_point = 1;
+     while(not_finished2) {
+ 
+      not_finished2 = compare.findNode(compare_node,compare_point);
+
+      if(not_finished2) {
+
+       not_finished2 = compare.findNode(compare_node2,compare_point+1);
+
+       if(not_finished2) {
+
+        // now have two line segments, find out if they intersect
+
+         is_crossover = find_crossover(reference_node, reference_node2, compare_node, compare_node2, crossover_node);
+
+         if(is_crossover) {
+           // add the node to the polygons and restart the search
+           shared_node_number++;
+           crossover_node -> shared_node_number = shared_node_number;
+           reference.insertNode(crossover_node,reference_point+1);
+           reference_node_count++;
+
+           compare.insertNode(crossover_node,compare_point+1);
+           compare_node_count++;
+
+           not_finished2 = false;
+
+         } else {
+
+          compare_point++;
+
+         }
+
+       } else {
+
+        reference_point++;
+
+       }
+
+      }
+
+     }
+
+    }
+
+   }
+
+  }
+
+
+
+  // might skip this to be more general
+  /// Doing something like the Weiler Atherton clipping algorithm https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_algorithm 
+  // will require a linked list
+
+
+  polygon_linked_list overlapping_polygon;
+  node * final_node = new node;
+
+
+  if (all_inside1 && ! all_inside2) {
+
+    // the reference cell is entirely contained within the compare cell
+    water = 1.0;
+
+  } else if (all_inside2 && ! all_inside1){
+
+    // the compare cell is entirely contained within the reference cell
+
+    water = find_quad_area(compare_cell);
+
+  } else {
+
+    // part of the compare cell is in the reference cell
+
+    // start by grabbing the first node of the reference cell
+
+    reference.findNode(final_node, 1)
+
+
+  }
+
+
+  if(all_inside) {
+
+    water = 1.0;
+
+  } else 
+
+  } else {
+
+   
+
+
+  }
+
+
+}
+
+bool is_crossover(node *reference1, node *reference2, node *compare1, node *compare2, node *crossover) {
+
+
+
+  double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
+  // good reference for the problems with floating point math: https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+
+  double slope_reference, slope_compare, intercept_reference, intercept_compare;
+
+  // first check if the slope of the reference points are infinite
+  if (fabs(reference1 -> x - reference2 -> x) < epsilon) {
+   // also check the reference
+   if (fabs(compare1 -> x - compare2 -> x) < epsilon) { // lines are likely parallel
+     
+     return false; // right now no check of the lines completely overlap, should do that in another part of the program
+   } else {
+
+    slope_compare = (compare1 -> y - compare2 -> y) / (compare1 -> x - compare2 -> x);
+    intercept_compare = compare1 -> y - compare1 -> x * slope_compare;
+
+    crossover -> x = reference1 -> x;
+    crossover -> y = reference1 -> x * slope_compare + intercept_compare;
+
+   }
+
+
+  } else {
+
+   slope_reference = (reference1 -> y - reference2 -> y) / (reference1 -> x - reference2 -> x);
+   intercept_reference = reference1 -> y - reference1 -> x * slope_reference;
+
+   if (fabs(compare1 -> x - compare2 -> x) < epsilon) { // assume that the line is vertical
+
+    crossover -> x = compare1 -> x;
+    crossover -> y = compare1 -> x * slope_reference + intercept_compare;
+     
+   } else { 
+
+    slope_compare = (compare1 -> y - compare2 -> y) / (compare1 -> x - compare2 -> x);
+    intercept_compare = compare1 -> y - compare1 -> x * slope_compare;
+
+    if(fabs(slope_reference - slope_compare) < epsilon) { // lines are likely parallel
+      return false; // right now no check of the lines completely overlap, should do that in another part of the program
+    }
+
+    crossover -> x = (intercept_reference - intercept_compare) / (slope_compare - slope_reference);
+    crossover -> y = reference1 -> crossover -> x * slope_compare + intercept_compare;
+
+   }
+
+  }
+
+  // check if the crossover is between the two lines, and not lying directly on one of the other nodes
+  if(crossover -> x < max(compare1 -> x, compare2 -> x) && crossover -> x > max(compare1 -> x, compare2 -> x) && 
+     crossover -> y < min(compare1 -> y, compare2 -> y) && crossover -> y > min(compare1 -> y, compare2 -> y) &&
+     crossover -> x < max(reference1 -> x, reference2 -> x) && crossover -> x > max(reference1 -> x, reference2 -> x) && 
+     crossover -> y < min(reference1 -> y, reference2 -> y) && crossover -> y > min(reference1 -> y, reference2 -> y) &&
+     fabs(crossover -> x - compare1 -> x) > epsilon && fabs(crossover -> x - compare2 -> x) > epsilon &&
+     fabs(crossover -> x - reference1 -> x) > epsilon && fabs(crossover -> x - reference2 -> x) > epsilon &&
+     fabs(crossover -> y - compare1 -> y) > epsilon && fabs(crossover -> y - compare2 -> y) > epsilon &&
+     fabs(crossover -> y - reference1 -> y) > epsilon && fabs(crossover -> y - reference2 -> y) > epsilon) {
+     crossover -> inside = true;
+     return true;
+  } else {
+    crossover -> inside = false;
+    return false;
+
+  }
+
+  // if it got this far without returning, there is obviously something wrong with the function
+
+  m_log->message(2,
+             "* warning: error in is_crossover()\n");
+
+  return false;
+
+}
+
+
+bool point_in_polygon(double polygon[][], int polygon_size, double x, double y, bool on_edge = false) {
+
+  // second index of polygon should be size 2 (for x and y), the other index is polygon_size
+
+  bool inside = false;
+
+  int current_point, next_point;
+
+
+
+  for(current_point=0; current_point<polygon_size; current_point++;) {
+
+    if(current_point == polygon_size - 1) {
+      next_point = 0;
+    } else {
+      next_point = current_point + 1;
+    }
+
+     // even-odd rule algorithm to determine if the point is inside or outside
+
+    if (min(polygon[current_point][1], polygon[next_point][1]) < y && max(polygon[current_point][1], polygon[next_point][1]) {
+
+     if (polygon[current_point][0] + (y - polygon[current_point][1]) / (polygon[next_point[1] - polygon[current_point][1]) * (polygon[next_point][0] - polygon[current_point][0]) < x) {
+
+      inside = ! inside;
+
+     }
+
+    }
+
+  }
+
+  if(!inside && on_edge) { // find out if the point is on the edge of the polygon
+
+   double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
+   double slope, intercept;
+
+   for(current_point=0; current_point<polygon_size; current_point++;) {
+
+    if(current_point == polygon_size - 1) {
+      next_point = 0;
+    } else {
+      next_point = current_point + 1;
+    }
+
+    if(fabs(polygon[current_point][0] - polygon[next_point][0]) < epsilon) { // probably a vertical line
+      if (fabs(x - fabs(polygon[current_point][0]) < epsilon) { // point has the same x, but is it in the range of y?
+        if (y >= min(polygon[current_point][1],polygon[next_point][1]) && y <= min(polygon[current_point][1],polygon[next_point][1])) { // falls on the line
+         return true;
+        }
+      }
+    } else {
+
+      slope = (polygon[current_point][1] - polygon[next_point][1]) / (polygon[current_point][0] - polygon[next_point][0]);
+      intercept = polygon[current_point][1] - polygon[current_point][0] * slope
+
+      if(fabs(y - slope*x+intercept) < epsilon) {
+       return true;
+      }
+
+    }
+
+
+  }
+
+
+  return inside;
+}
 
 // put variables you want to output to file in these functions
 void HydrologyMod::define_model_state_impl(const PIO &output) const {
@@ -1109,6 +1283,98 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
   m_log->message(2,"* finished tunnels ...\n");
 
 }
+
+
+// adding in the linked list class
+class polygon_linked_list;
+
+ polygon_linked_list::polygon_linked_list(){ // constructor
+
+   head -> x = 0;
+   head -> y = 0;
+   head -> next = NULL;
+   head -> shared_node_number = 0;
+   listLength = 0;
+
+
+ }
+
+ polygon_linked_list::~polygon_linked_list(){ // destructor
+
+   node * p = head;
+   node * q = head;
+   while (q){
+    p = q;
+    q = p -> next;
+    if (q) delete p;
+   }
+
+ }
+
+
+ void insertNode( node * newNode, int position ){
+
+  if ((position <= 0) || (position > listLength + 1)){
+        m_log->message(2,"* There is something wrong with code to insert a node (1)!!!!\n";     
+  }
+
+  if (head -> next == NULL){
+    head -> next = newNode;
+    listLength++;
+    return;
+  }
+
+  int count = 0;
+  node * p = head;
+  node * q = head;
+  while (q){ 
+    if (count == position){
+      p -> next = newNode;
+      newNode -> next = q;
+      listlength++;
+      return;
+    }
+    p = q;
+    q = p -> next;
+    count++;
+  }
+
+  if (count == position){
+    p -> next = newNode;
+    newNode -> next = q;
+    listLength++;
+    return;
+  }
+  // couldn't add point for some reason
+  m_log->message(2,"* There is something wrong with code to insert a node (2)!!!!\n";     
+ }
+}
+
+ bool findNode(node * node_out, int position) {
+
+  if ((position <= 0) || (position > listLength + 1)){
+      return false;  
+  }
+
+
+  node * q = head;
+
+  while (q != null){
+   if (q -> next == position){
+
+      node_out -> q;
+
+
+      return true;
+    }
+    q = q -> next
+
+  }
+
+  return false;
+
+ }
+
 
 } // end namespace hydrology
 } // end namespace pism
