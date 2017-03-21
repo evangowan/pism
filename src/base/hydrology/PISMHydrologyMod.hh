@@ -85,7 +85,8 @@ struct node
     double y;
     bool inside;
     int shared_node_number;
-    node * next;
+    node * next[3];
+
 };
 
 
@@ -93,17 +94,17 @@ class polygon_linked_list{
 
 public:
 
+
    polygon_linked_list(); // constructor
    ~polygon_linked_list(); // destructor
    void insertNode( node * newNode, int position );
    removeNode( int position );
 
 private:
-    // Head of the list contains no song data, 
-    // but points to the song playlist.
-    node * head;
-    int listLength;
 
+   node * head;
+   int listLength;
+   int polygon_number;
 }
 
 } // end namespace hydrology

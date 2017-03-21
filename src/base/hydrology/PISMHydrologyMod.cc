@@ -631,8 +631,8 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
   double water;
 
-  polygon_linked_list reference;
-  polygon_linked_list compare;
+  polygon_linked_list reference(1);
+  polygon_linked_list compare(2);
   
   int reference_node_count = 0;
   int compare_node_count = 0;
@@ -776,19 +776,20 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
 
 
-  // might skip this to be more general
+
   /// Doing something like the Weiler Atherton clipping algorithm https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_algorithm 
   // will require a linked list
 
 
-  polygon_linked_list overlapping_polygon;
+  polygon_linked_list overlapping_polygon(3);
   node * final_node = new node;
+
 
 
   if (all_inside1 && ! all_inside2) {
 
     // the reference cell is entirely contained within the compare cell
-    water = 1.0;
+    water = find_quad_area(reference_cell);
 
   } else if (all_inside2 && ! all_inside1){
 
@@ -802,24 +803,116 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
     // start by grabbing the first node of the reference cell
 
-    reference.findNode(final_node, 1)
+    int counter = 1, overlap_points = 1;
+    bool found_first = false;
+    bool found_node_reference, find_node_compare;
+    bool use_reference;
 
+    while(! found_first) {
+     found_node_reference = reference.findNode(reference_node, counter);
+     found_node_compare = compare.findNode(compare_node, counter);
 
-  }
+     if(found_node && found_node_compare) { // have to decide which one comes first
+      if(reference_node -> inside && ! compare_node -> inside) { // reference node comes first
+       overlapping_polygon.addNode(reference_node,overlap_points);
+       final_node = reference_node;
+       found_first = true;
+       use_reference = true;
 
+      } else if (! reference_node -> inside &&  compare_node -> inside) { // compare node comes first
 
-  if(all_inside) {
+       overlapping_polygon.addNode(compare_node,overlap_points);
+       final_node = compare_node;
+       found_first = true;
+       use_reference = false;
 
-    water = 1.0;
+      } else if(reference_node -> inside &&  compare_node -> inside) { // both nodes are possible candidates, I'm assuming it doesn't really matter which one you choose, so I just pick the reference one. Keeping this if it this turns out to be a bad assumption.
 
-  } else 
+       overlapping_polygon.addNode(reference_node,overlap_points);
+       final_node = reference_node;
+       found_first = true;
+       use_reference = true;
 
-  } else {
+      } else {
+         counter++;
+      }
+     } else {
+       water = 0.0; // no overlap
+     }
 
+    }
+
+   // this should work assuming there isn't multiple overlapping polygons
+
+   bool end_found = false;
+   bool found_counter;
+   node * overlap_node = new node;
    
+   while(! end_found) {
 
+    if(use_reference) {
+     counter++;
+     found_node_reference = reference.findNode(reference_node, counter);
+     if(found_node_reference && reference_node -> inside) {
+       overlap_points++;
+       overlapping_polygon.addNode(reference_node,overlap_points);
+       overlap_node = reference_node;
+     } else { // switch to other polygon
+      counter = 1;
+      found_counter = false;
+
+      while(! found_counter) {
+       found_node_compare = compare.findNode(compare_node, counter);
+       if(compare_node -> next[0] == reference_node -> next[0]{
+        found_counter = true;
+       }       
+
+      }
+
+     }
+
+    } else {
+
+     counter++;
+     found_node_compare = compare.findNode(compare_node, counter);
+     if(found_node_compare && compare_node -> inside) {
+       overlap_points++;
+       overlapping_polygon.addNode(compare_node,overlap_points);
+       overlap_node = compare_node;
+     } else { // switch to other polygon
+      counter = 1;
+      found_counter = false;
+
+      while(! found_counter) {
+       found_node_reference = reference.findNode(reference_node, counter);
+       if(reference_node -> next[1] == compare_node -> next[1]{
+        found_counter = true;
+       } // end if     
+
+      } // end while
+
+     } // end if
+
+    } // end if
+
+    // test if the current node is the last one
+
+    if (overlap_node -> next[0] == final_node || overlap_node -> next[1]) {
+     end_found = true;
+    } // end if
+
+   } // end while
 
   }
+
+
+  // deallocate memory
+
+  overlap.~polygon_linked_list();
+  compare.~polygon_linked_list();
+  reference.~polygon_linked_list();
+
+  return water;
 
 
 }
@@ -1288,12 +1381,21 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 // adding in the linked list class
 class polygon_linked_list;
 
- polygon_linked_list::polygon_linked_list(){ // constructor
+ polygon_linked_list::polygon_linked_list(int number){ // constructor
+
+  if(number >= 3 || number < 0) {
+    m_log->message(2,"* error initializing polygon_linked_list ...\n");
+  }
+
+   polygon_number = number;
 
    head -> x = 0;
    head -> y = 0;
-   head -> next = NULL;
+   head -> next[0] = NULL;
+   head -> next[1] = NULL;
+   head -> next[2] = NULL;
    head -> shared_node_number = 0;
+   
    listLength = 0;
 
 
@@ -1303,10 +1405,34 @@ class polygon_linked_list;
 
    node * p = head;
    node * q = head;
+
+   int check1, check2;
+
    while (q){
     p = q;
-    q = p -> next;
-    if (q) delete p;
+    q = p -> next[polygon_number];
+
+    if (q) { // need to also check that there are not other pointers in this node before deleting
+     if(polygon_number == 0) {
+      check1 = 1;
+      check2 = 2;
+     } else if (polygon_number == 1) {
+      check1 = 0;
+      check2 = 2;
+     } else {
+      check1 = 0;
+      check2 = 1;
+     }
+
+     if ( ! p -> next[check1] && ! p -> next[check] ) { // safe to delete
+
+       delete p;
+     else { // get rid of the pointer
+
+      p -> next[polygon_number] = NULL; 
+
+     }
+    }
    }
 
  }
@@ -1318,8 +1444,8 @@ class polygon_linked_list;
         m_log->message(2,"* There is something wrong with code to insert a node (1)!!!!\n";     
   }
 
-  if (head -> next == NULL){
-    head -> next = newNode;
+  if (head -> next[polygon_number] == NULL){
+    head -> next[polygon_number] = newNode;
     listLength++;
     return;
   }
@@ -1329,19 +1455,19 @@ class polygon_linked_list;
   node * q = head;
   while (q){ 
     if (count == position){
-      p -> next = newNode;
-      newNode -> next = q;
+      p -> next[polygon_number] = newNode;
+      newNode -> next[polygon_number] = q;
       listlength++;
       return;
     }
     p = q;
-    q = p -> next;
+    q = p -> next[polygon_number];
     count++;
   }
 
   if (count == position){
-    p -> next = newNode;
-    newNode -> next = q;
+    p -> next[polygon_number] = newNode;
+    newNode -> next[polygon_number] = q;
     listLength++;
     return;
   }
@@ -1356,18 +1482,18 @@ class polygon_linked_list;
       return false;  
   }
 
-
+  int count = 0;
   node * q = head;
 
-  while (q != null){
-   if (q -> next == position){
+  while (q){
+   if(count == position) {
 
-      node_out -> q;
+      node_out -> q -> next[polygon_number];
 
 
       return true;
     }
-    q = q -> next
+    q = q -> next[polygon_number]
 
   }
 
