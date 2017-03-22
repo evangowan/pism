@@ -38,7 +38,15 @@ class StressBalance;
 //! @brief Sub-glacial hydrology models and related diagnostics.
 namespace hydrology {
 
+struct node
+{
+    double x;
+    double y;
+    bool inside;
+    int shared_node_number;
+    node * next[3];
 
+};
 class HydrologyMod : public Hydrology {
 public:
 
@@ -61,12 +69,19 @@ protected:
   virtual void update_impl(double t, double dt);
 //  virtual std::map<std::string, Diagnostic::Ptr> diagnostics_impl() const;
 
+  virtual double find_quad_area(double quadrilateral[4][2]);
+  virtual double calculate_water(double reference_cell[4][2], double compare_cell[4][2]);
+  virtual bool find_crossover(node *reference1, node *reference2, node *compare1, node *compare2, node *crossover);
+  virtual bool point_in_polygon(double polygon[][2], int polygon_size, double x, double y, bool on_edge = false);
+
   virtual void define_model_state_impl(const PIO &output) const;
   virtual void write_model_state_impl(const PIO &output) const;
 
   virtual void pressure_gradient(IceModelVec2V &result, IceModelVec2S &result_mag, IceModelVec2S &result_angle);
   virtual void till_drainage(IceModelVec2S &result, double dt);
   virtual void tunnels(IceModelVec2S &result);
+
+
 
   virtual MaxTimestep max_timestep_impl(double t) const;
 
@@ -79,15 +94,7 @@ private:
 // linked list for creating a polygon
 // I used this nice tutorial as a basis for this code: http://pumpkinprogrammer.com/2014/06/13/c-tutorial-intro-to-linked-lists/
 
-struct node
-{
-    double x;
-    double y;
-    bool inside;
-    int shared_node_number;
-    node * next[3];
 
-};
 
 
 class polygon_linked_list{
@@ -95,17 +102,17 @@ class polygon_linked_list{
 public:
 
 
-   polygon_linked_list(); // constructor
+   polygon_linked_list(int number); // constructor
    ~polygon_linked_list(); // destructor
    void insertNode( node * newNode, int position );
-   removeNode( int position );
+   bool findNode(node * node_out, int position);
 
 private:
-
+   const Logger::Ptr m_log_local;
    node * head;
    int listLength;
    int polygon_number;
-}
+};
 
 } // end namespace hydrology
 

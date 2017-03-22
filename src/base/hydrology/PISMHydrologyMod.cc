@@ -372,14 +372,14 @@ void HydrologyMod::update_impl(double t, double dt) {
       } else {
 
         m_Wtil(i,j) = tillwat_max * flux_ratio;
-      }
+      } // end if
 
 
       m_excess_water(i,j) = m_total_input(i, j);
 
  //     m_log->message(2, "%5i %5i %15.10f %15.10f %15.10f \n", i, j, m_total_input(i, j), m_excess_water(i,j), flux_ratio  );
 
-    }
+    } // end if
 
 /*
     } else if (m_total_input(i, j)/m_fraction_till(i,j) < m_tillwat_flux(i,j)) {  
@@ -426,7 +426,7 @@ void HydrologyMod::update_impl(double t, double dt) {
     }
 */
 
-  }
+  } // end for
 
 
 
@@ -472,14 +472,14 @@ void HydrologyMod::update_impl(double t, double dt) {
 
     // first find the translation of the center of all the cells
 
-    for(x_counter=0; x_counter<3; x_counter++; ){
-      for(y_counter=0; y_counter<3; y_counter++; ){ 
+    for(x_counter=0; x_counter<3; x_counter++ ){
+      for(y_counter=0; y_counter<3; y_counter++ ){ 
 
         translate_center[x_counter][y_counter][0] = cos(m_theta(i-x_counter-1,j-y_counter-1)); // translate x
         translate_center[x_counter][y_counter][1] = sin(m_theta(i-x_counter-1,j-y_counter-1)); // translate y
 
-      }
-    }
+      }  // end for
+    } // end for
 
     // bottom left
 
@@ -522,7 +522,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 
     quad_area(i,j) = find_quad_area(quadrilateral);
 
-  } else {
+   } else {
 
     // bottom right
 
@@ -547,9 +547,10 @@ void HydrologyMod::update_impl(double t, double dt) {
     top_left(i,j).v = 0.5;
 
     quad_area(i,j) = 1;
-
+   } // end if (hope this is in the right spot
  
-  }
+  } // end for
+
 
   // now that we know where the water spreads to, find how much goes into each cell
 
@@ -561,7 +562,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   bottom_right.update_ghosts();
   quad_area.update_ghosts();
   
-  double[4][2] reference_cell, compare_cell;
+  double reference_cell[4][2], compare_cell[4][2];
 
   reference_cell[0][0] = -0.5; // bottom left
   reference_cell[0][1] = -0.5;
@@ -578,8 +579,8 @@ void HydrologyMod::update_impl(double t, double dt) {
    if(mask.icy(i,j) ) {
 
     // make a call to the formula 
-    for(x_counter=0; x_counter<3; x_counter++; ){
-      for(y_counter=0; y_counter<3; y_counter++; ){ 
+    for(x_counter=0; x_counter<3; x_counter++ ){
+      for(y_counter=0; y_counter<3; y_counter++ ){ 
 
         compare_cell[0][0] = double(x_counter-1) + bottom_left(i,j).u; // bottom left
         compare_cell[0][1] = double(y_counter-1) + bottom_left(i,j).v; 
@@ -592,9 +593,10 @@ void HydrologyMod::update_impl(double t, double dt) {
 
         m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
 
-      }
-    }
-  }
+      } // end for
+    } // end for
+   } // end if
+  } // end for
 
   m_excess_water.copy_from(m_excess_water_playground);
   m_log->message(2,
@@ -603,7 +605,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 }
 
-double find_quad_area(double quadrilateral[4][2]) {
+double HydrologyMod::find_quad_area(double quadrilateral[4][2]) {
 
 
   double a_x = quadrilateral[0][0] - quadrilateral[2][0];
@@ -615,7 +617,7 @@ double find_quad_area(double quadrilateral[4][2]) {
 
 }
 
-double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
+double HydrologyMod::calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
   bool corner_inside1[4], corner_inside2[4];
 
@@ -660,8 +662,8 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
     reference_node_count++;
 
 
-    compare_node -> x = compare[counter][0];
-    compare_node -> y = compare[counter][1];
+    compare_node -> x = compare_cell[counter][0];
+    compare_node -> y = compare_cell[counter][1];
     reference_node -> shared_node_number = 0;
     compare_node -> inside = corner_inside2[counter];
 
@@ -684,7 +686,7 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
     if(!corner_inside1[counter]) {
 
-      all_inside1 = false;
+      all_inside = false;
 
     }
 
@@ -786,12 +788,12 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
 
 
-  if (all_inside1 && ! all_inside2) {
+  if (all_inside && ! all_inside2) {
 
     // the reference cell is entirely contained within the compare cell
     water = find_quad_area(reference_cell);
 
-  } else if (all_inside2 && ! all_inside1){
+  } else if (all_inside2 && ! all_inside){
 
     // the compare cell is entirely contained within the reference cell
 
@@ -805,30 +807,30 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
     int counter = 1, overlap_points = 1;
     bool found_first = false;
-    bool found_node_reference, find_node_compare;
+    bool found_node_reference, found_node_compare;
     bool use_reference;
 
     while(! found_first) {
      found_node_reference = reference.findNode(reference_node, counter);
      found_node_compare = compare.findNode(compare_node, counter);
 
-     if(found_node && found_node_compare) { // have to decide which one comes first
+     if(found_node_reference && found_node_compare) { // have to decide which one comes first
       if(reference_node -> inside && ! compare_node -> inside) { // reference node comes first
-       overlapping_polygon.addNode(reference_node,overlap_points);
+       overlapping_polygon.insertNode(reference_node,overlap_points);
        final_node = reference_node;
        found_first = true;
        use_reference = true;
 
       } else if (! reference_node -> inside &&  compare_node -> inside) { // compare node comes first
 
-       overlapping_polygon.addNode(compare_node,overlap_points);
+       overlapping_polygon.insertNode(compare_node,overlap_points);
        final_node = compare_node;
        found_first = true;
        use_reference = false;
 
       } else if(reference_node -> inside &&  compare_node -> inside) { // both nodes are possible candidates, I'm assuming it doesn't really matter which one you choose, so I just pick the reference one. Keeping this if it this turns out to be a bad assumption.
 
-       overlapping_polygon.addNode(reference_node,overlap_points);
+       overlapping_polygon.insertNode(reference_node,overlap_points);
        final_node = reference_node;
        found_first = true;
        use_reference = true;
@@ -855,7 +857,7 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
      found_node_reference = reference.findNode(reference_node, counter);
      if(found_node_reference && reference_node -> inside) {
        overlap_points++;
-       overlapping_polygon.addNode(reference_node,overlap_points);
+       overlapping_polygon.insertNode(reference_node,overlap_points);
        overlap_node = reference_node;
      } else { // switch to other polygon
       counter = 1;
@@ -863,7 +865,7 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
       while(! found_counter) {
        found_node_compare = compare.findNode(compare_node, counter);
-       if(compare_node -> next[0] == reference_node -> next[0]{
+       if(compare_node -> next[0] == reference_node -> next[0]){
         found_counter = true;
        }       
 
@@ -877,7 +879,7 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
      found_node_compare = compare.findNode(compare_node, counter);
      if(found_node_compare && compare_node -> inside) {
        overlap_points++;
-       overlapping_polygon.addNode(compare_node,overlap_points);
+       overlapping_polygon.insertNode(compare_node,overlap_points);
        overlap_node = compare_node;
      } else { // switch to other polygon
       counter = 1;
@@ -885,7 +887,7 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
       while(! found_counter) {
        found_node_reference = reference.findNode(reference_node, counter);
-       if(reference_node -> next[1] == compare_node -> next[1]{
+       if(reference_node -> next[1] == compare_node -> next[1]){
         found_counter = true;
        } // end if     
 
@@ -903,12 +905,18 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
    } // end while
 
+   // TODO add function to calculate area of resulting polygon
+
+   // for now, just set water to equal 1
+
+   water = 1.0;
+
   }
 
 
   // deallocate memory
 
-  overlap.~polygon_linked_list();
+  overlapping_polygon.~polygon_linked_list();
   compare.~polygon_linked_list();
   reference.~polygon_linked_list();
 
@@ -917,7 +925,7 @@ double calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
 
 }
 
-bool is_crossover(node *reference1, node *reference2, node *compare1, node *compare2, node *crossover) {
+bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *compare1, node *compare2, node *crossover) {
 
 
 
@@ -963,21 +971,21 @@ bool is_crossover(node *reference1, node *reference2, node *compare1, node *comp
     }
 
     crossover -> x = (intercept_reference - intercept_compare) / (slope_compare - slope_reference);
-    crossover -> y = reference1 -> crossover -> x * slope_compare + intercept_compare;
+    crossover -> y = crossover -> x * slope_compare + intercept_compare;
 
    }
 
   }
 
   // check if the crossover is between the two lines, and not lying directly on one of the other nodes
-  if(crossover -> x < max(compare1 -> x, compare2 -> x) && crossover -> x > max(compare1 -> x, compare2 -> x) && 
-     crossover -> y < min(compare1 -> y, compare2 -> y) && crossover -> y > min(compare1 -> y, compare2 -> y) &&
-     crossover -> x < max(reference1 -> x, reference2 -> x) && crossover -> x > max(reference1 -> x, reference2 -> x) && 
-     crossover -> y < min(reference1 -> y, reference2 -> y) && crossover -> y > min(reference1 -> y, reference2 -> y) &&
-     fabs(crossover -> x - compare1 -> x) > epsilon && fabs(crossover -> x - compare2 -> x) > epsilon &&
-     fabs(crossover -> x - reference1 -> x) > epsilon && fabs(crossover -> x - reference2 -> x) > epsilon &&
-     fabs(crossover -> y - compare1 -> y) > epsilon && fabs(crossover -> y - compare2 -> y) > epsilon &&
-     fabs(crossover -> y - reference1 -> y) > epsilon && fabs(crossover -> y - reference2 -> y) > epsilon) {
+  if(crossover -> x < std::max(compare1 -> x, compare2 -> x) && crossover -> x > std::max(compare1 -> x, compare2 -> x) && 
+     crossover -> y < std::min(compare1 -> y, compare2 -> y) && crossover -> y > std::min(compare1 -> y, compare2 -> y) &&
+     crossover -> x < std::max(reference1 -> x, reference2 -> x) && crossover -> x > std::max(reference1 -> x, reference2 -> x) && 
+     crossover -> y < std::min(reference1 -> y, reference2 -> y) && crossover -> y > std::min(reference1 -> y, reference2 -> y) &&
+     std::fabs(crossover -> x - compare1 -> x) > epsilon && std::fabs(crossover -> x - compare2 -> x) > epsilon &&
+     std::fabs(crossover -> x - reference1 -> x) > epsilon && std::fabs(crossover -> x - reference2 -> x) > epsilon &&
+     std::fabs(crossover -> y - compare1 -> y) > epsilon && std::fabs(crossover -> y - compare2 -> y) > epsilon &&
+     std::fabs(crossover -> y - reference1 -> y) > epsilon && std::fabs(crossover -> y - reference2 -> y) > epsilon) {
      crossover -> inside = true;
      return true;
   } else {
@@ -989,14 +997,14 @@ bool is_crossover(node *reference1, node *reference2, node *compare1, node *comp
   // if it got this far without returning, there is obviously something wrong with the function
 
   m_log->message(2,
-             "* warning: error in is_crossover()\n");
+             "* warning: error in find_crossover()\n");
 
   return false;
 
 }
 
 
-bool point_in_polygon(double polygon[][], int polygon_size, double x, double y, bool on_edge = false) {
+bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, double x, double y, bool on_edge ) {
 
   // second index of polygon should be size 2 (for x and y), the other index is polygon_size
 
@@ -1006,7 +1014,7 @@ bool point_in_polygon(double polygon[][], int polygon_size, double x, double y, 
 
 
 
-  for(current_point=0; current_point<polygon_size; current_point++;) {
+  for(current_point=0; current_point<polygon_size; current_point++) {
 
     if(current_point == polygon_size - 1) {
       next_point = 0;
@@ -1016,9 +1024,9 @@ bool point_in_polygon(double polygon[][], int polygon_size, double x, double y, 
 
      // even-odd rule algorithm to determine if the point is inside or outside
 
-    if (min(polygon[current_point][1], polygon[next_point][1]) < y && max(polygon[current_point][1], polygon[next_point][1]) {
+    if (std::min(polygon[current_point][1], polygon[next_point][1]) < y && std::max(polygon[current_point][1], polygon[next_point][1])) {
 
-     if (polygon[current_point][0] + (y - polygon[current_point][1]) / (polygon[next_point[1] - polygon[current_point][1]) * (polygon[next_point][0] - polygon[current_point][0]) < x) {
+     if (polygon[current_point][0] + (y - polygon[current_point][1]) / (polygon[next_point][1] - polygon[current_point][1]) * (polygon[next_point][0] - polygon[current_point][0]) < x) {
 
       inside = ! inside;
 
@@ -1033,7 +1041,7 @@ bool point_in_polygon(double polygon[][], int polygon_size, double x, double y, 
    double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
    double slope, intercept;
 
-   for(current_point=0; current_point<polygon_size; current_point++;) {
+   for(current_point=0; current_point<polygon_size; current_point++) {
 
     if(current_point == polygon_size - 1) {
       next_point = 0;
@@ -1041,27 +1049,27 @@ bool point_in_polygon(double polygon[][], int polygon_size, double x, double y, 
       next_point = current_point + 1;
     }
 
-    if(fabs(polygon[current_point][0] - polygon[next_point][0]) < epsilon) { // probably a vertical line
-      if (fabs(x - fabs(polygon[current_point][0]) < epsilon) { // point has the same x, but is it in the range of y?
-        if (y >= min(polygon[current_point][1],polygon[next_point][1]) && y <= min(polygon[current_point][1],polygon[next_point][1])) { // falls on the line
+    if(std::fabs(polygon[current_point][0] - polygon[next_point][0]) < epsilon) { // probably a vertical line
+      if (std::fabs(x - std::fabs(polygon[current_point][0])) < epsilon) { // point has the same x, but is it in the range of y?
+        if (y >= std::min(polygon[current_point][1],polygon[next_point][1]) && y <= std::min(polygon[current_point][1],polygon[next_point][1])) { // falls on the line
          return true;
         }
       }
     } else {
 
       slope = (polygon[current_point][1] - polygon[next_point][1]) / (polygon[current_point][0] - polygon[next_point][0]);
-      intercept = polygon[current_point][1] - polygon[current_point][0] * slope
+      intercept = polygon[current_point][1] - polygon[current_point][0] * slope;
 
-      if(fabs(y - slope*x+intercept) < epsilon) {
+      if(std::fabs(y - slope*x+intercept) < epsilon) {
        return true;
-      }
+      } // end if
 
-    }
-
-
-  }
+    } // end if
 
 
+   } // end for
+
+  } // end if
   return inside;
 }
 
@@ -1379,12 +1387,13 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
 
 // adding in the linked list class
-class polygon_linked_list;
+//class polygon_linked_list;
 
  polygon_linked_list::polygon_linked_list(int number){ // constructor
 
+
   if(number >= 3 || number < 0) {
-    m_log->message(2,"* error initializing polygon_linked_list ...\n");
+    m_log_local->message(2,"* error initializing polygon_linked_list ...\n");
   }
 
    polygon_number = number;
@@ -1424,10 +1433,10 @@ class polygon_linked_list;
       check2 = 1;
      }
 
-     if ( ! p -> next[check1] && ! p -> next[check] ) { // safe to delete
+     if ( ! p -> next[check1] && ! p -> next[check2] ) { // safe to delete
 
        delete p;
-     else { // get rid of the pointer
+     } else { // get rid of the pointer
 
       p -> next[polygon_number] = NULL; 
 
@@ -1438,17 +1447,17 @@ class polygon_linked_list;
  }
 
 
- void insertNode( node * newNode, int position ){
+ void polygon_linked_list::insertNode( node * newNode, int position ){
 
   if ((position <= 0) || (position > listLength + 1)){
-        m_log->message(2,"* There is something wrong with code to insert a node (1)!!!!\n";     
-  }
+        m_log_local->message(2,"* There is something wrong with code to insert a node (1)!!!!\n");     
+  } // end if
 
   if (head -> next[polygon_number] == NULL){
     head -> next[polygon_number] = newNode;
     listLength++;
     return;
-  }
+  } // end if
 
   int count = 0;
   node * p = head;
@@ -1457,30 +1466,30 @@ class polygon_linked_list;
     if (count == position){
       p -> next[polygon_number] = newNode;
       newNode -> next[polygon_number] = q;
-      listlength++;
+      listLength++;
       return;
-    }
+    } // end if
     p = q;
     q = p -> next[polygon_number];
     count++;
-  }
+  } // end while
 
   if (count == position){
     p -> next[polygon_number] = newNode;
     newNode -> next[polygon_number] = q;
     listLength++;
     return;
-  }
+  } // end if
   // couldn't add point for some reason
-  m_log->message(2,"* There is something wrong with code to insert a node (2)!!!!\n";     
- }
-}
+  m_log_local->message(2,"* There is something wrong with code to insert a node (2)!!!!\n");     
+ 
+ } // end polygon_linked_list::insertNode
 
- bool findNode(node * node_out, int position) {
+ bool polygon_linked_list::findNode(node * node_out, int position) {
 
   if ((position <= 0) || (position > listLength + 1)){
       return false;  
-  }
+  } // end if
 
   int count = 0;
   node * q = head;
@@ -1488,18 +1497,18 @@ class polygon_linked_list;
   while (q){
    if(count == position) {
 
-      node_out -> q -> next[polygon_number];
+      node_out = q -> next[polygon_number];
 
 
       return true;
-    }
-    q = q -> next[polygon_number]
+    } // end if
+    q = q -> next[polygon_number];
 
-  }
+  } // end while
 
   return false;
 
- }
+ } // end polygon_linked_list::findNode
 
 
 } // end namespace hydrology
