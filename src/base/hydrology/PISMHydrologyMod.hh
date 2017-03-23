@@ -108,7 +108,7 @@ public:
    bool findNode(node * node_out, int position);
 
 private:
-   const Logger::Ptr m_log_local;
+
    node * head;
    int listLength;
    int polygon_number;
