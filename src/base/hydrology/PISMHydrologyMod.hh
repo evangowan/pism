@@ -47,6 +47,24 @@ struct node
     node * next[3];
 
 };
+
+
+class polygon_linked_list{
+
+public:
+
+
+   polygon_linked_list(int number); // constructor
+   ~polygon_linked_list(); // destructor
+   void insertNode(struct  node * newNode, int position );
+   bool findNode(struct node *& node_out, int position);
+private:
+
+   node * head;
+   int listLength;
+   int polygon_number;
+};
+
 class HydrologyMod : public Hydrology {
 public:
 
@@ -71,7 +89,9 @@ protected:
 
   virtual double find_quad_area(double quadrilateral[4][2]);
   virtual double calculate_water(double reference_cell[4][2], double compare_cell[4][2]);
-  virtual bool find_crossover(node *reference1, node *reference2, node *compare1, node *compare2, node *crossover);
+  virtual bool find_crossover(node *reference1, node *reference2, node *compare1, node *compare2, node *&crossover);
+
+  virtual bool find_shared_node(struct node *& node_check, polygon_linked_list &list_to_check);
   virtual bool point_in_polygon(double polygon[][2], int polygon_size, double x, double y, bool on_edge = false);
 
   virtual void define_model_state_impl(const PIO &output) const;
@@ -97,22 +117,6 @@ private:
 
 
 
-class polygon_linked_list{
-
-public:
-
-
-   polygon_linked_list(int number); // constructor
-   ~polygon_linked_list(); // destructor
-   void insertNode( node * newNode, int position );
-   bool findNode(node * node_out, int position);
-
-private:
-
-   node * head;
-   int listLength;
-   int polygon_number;
-};
 
 } // end namespace hydrology
 
