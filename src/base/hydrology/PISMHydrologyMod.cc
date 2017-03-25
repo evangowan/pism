@@ -685,9 +685,11 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
   int compare_node_count = 0;
 
 
-  node * reference_node2 = new node;
-  
-  node * compare_node2 = new node;
+  node * reference_node2;
+  node * compare_node2;
+  node * reference_node;
+  node * compare_node;
+  node * created_node;
 
   bool on_edge = true; // used in point_in_polygon to check if the point is on the edge of the reference polygon
 
@@ -698,18 +700,26 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      m_log->message(2, "* assigning points %5i \n", counter);
     // check if reference corner is inside the reference
     corner_inside1[counter] = point_in_polygon(compare_cell, polygon_size, reference_cell[counter][0], reference_cell[counter][1], on_edge);
-//    corner_inside2[counter] = point_in_polygon(reference_cell, polygon_size, compare_cell[counter][0], compare_cell[counter][1], on_edge);
 
-    node * reference_node = new node;
+    if(!corner_inside1[counter]) {
+       m_log->message(2, "* turning off all inside %5i \n", corner_inside1[counter]);
+      all_inside = false;
+
+    }
+    created_node = new node;
+    reference_node =  created_node;
     reference_node -> x = reference_cell[counter][0];
     reference_node -> y = reference_cell[counter][1];
     reference_node -> shared_node_number = 0;
     reference_node -> inside = corner_inside1[counter];
+    reference_node -> next[0] = NULL;
     reference_node -> next[1] = NULL;
     reference_node -> next[2] = NULL;
-    m_log->message(2, "* adding reference_node %5i %15.10f %15.10f %15.10f %15.10f \n", counter, reference_node -> x, reference_node -> y, reference_cell[counter][0], reference_cell[counter][1]); 
+
     reference.insertNode(reference_node,counter+1);
     reference_node_count++;
+
+      m_log->message(2, "* adding reference_node %5i %2i %p %p \n", counter, corner_inside1[counter], reference_node, reference_node -> next[0]); 
    /*
     node * compare_node = new node;
     compare_node -> x = compare_cell[counter][0];
@@ -726,7 +736,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
     if(counter == 0) {  // create a full polygon this way 
 
-      node * reference_node = new node;
+      created_node = new node;
+      reference_node =  created_node;
       reference_node -> x = reference_cell[counter][0];
       reference_node -> y = reference_cell[counter][1];
       reference_node -> shared_node_number = 0;
@@ -735,73 +746,72 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
       reference_node -> next[1] = NULL;
       reference_node -> next[2] = NULL;
       reference.insertNode(reference_node,2);
-      reference_node_count++;
-    /*
-      node * compare_node = new node;
-      compare_node -> x = compare_cell[counter][0];
-      compare_node -> y = compare_cell[counter][1];
-      compare_node -> shared_node_number = 0;
-      compare_node -> inside = corner_inside2[counter];
-      compare_node -> next[0] = NULL;
-      compare_node -> next[1] = NULL;
-      compare_node -> next[2] = NULL;
-      compare.insertNode(compare_node,2);
-      compare_node_count++;
-    */
-
+  //    reference_node_count++;
+      m_log->message(2, "* adding reference_node %5i %2i %p %p \n", counter, corner_inside1[counter], reference_node, reference_node -> next[0]); 
+  
     }
 
-    /*
-    if(corner_inside1[counter] || corner_inside2[counter]) {
-      all_outside = false;
-    }
-    */
 
-    if(!corner_inside1[counter]) {
 
-      all_inside = false;
 
-    }
-    /*
-    if(!corner_inside2[counter]) {
-
-      all_inside2 = false;
-
-    }
-   */
 
   }
-  node * reference_node = new node;
 
-     m_log->message(2, "* testing the reference object before adding the compare object:\n");
-    reference.findNode(reference_node,2);
+
+//  reference_node = new node;
+
+     m_log->message(2, "* adding the compare object **********************************:\n");
+
 
   // next add the compare cell
+
   for(counter = 0; counter < polygon_size; counter++) {
+   double epsilon = 0.000001;
    m_log->message(2, "* compare assigning points %5i \n", counter);
 
    corner_inside2[counter] = point_in_polygon(reference_cell, polygon_size, compare_cell[counter][0], compare_cell[counter][1], on_edge);
 
-     m_log->message(2, "* testing the reference object before creating a new compare node:\n");
-    reference.findNode(reference_node,1);
-     m_log->message(2, "* before add node: %p %15.10f \n", reference_node -> next[0], reference_node -> x);
-    node * compare_node = new node;
+     m_log->message(2, "* after point_in_polygon %5i \n", corner_inside2[counter]);
 
-    m_log->message(2, "* addresses of compare node and reference node: %p %p \n", reference_node, compare_node);
+    if(corner_inside1[counter] || corner_inside2[counter]) {
+      m_log->message(2, "* all_outside should be false %5i \n", corner_inside2[counter]);
+      all_outside = false;
+    }
+
+    if(!corner_inside2[counter]) {
+      m_log->message(2, "* all_inside2 should be false %5i \n", corner_inside2[counter]);
+      all_inside2 = false;
+
+    }
+
+//     m_log->message(2, "* testing the reference object before creating a new compare node:\n");
+ //   reference.findNode(reference_node,1);
+//     m_log->message(2, "* before add node: %p %15.10f \n", reference_node -> next[0], reference_node -> x);
 
 
+    m_log->message(2, "* before creating node: \n");
+    bool dummy = reference.findNode(reference_node,2);
+    dummy = compare.findNode(compare_node,2);
+    dummy = compare.findNode(compare_node,2);
+    
+    m_log->message(2, "* address of reference and compare nodes: %p %p %p\n", reference_node, compare_node, created_node);
+    created_node = new node;
+ //   created_node = new node;
+    compare_node = created_node;
+
+    m_log->message(2, "* address of reference and compare nodes: %p %p %p\n", reference_node, compare_node, created_node);
+    dummy = compare.findNode(compare_node,2);
+    m_log->message(2, "* done checking, adding:\n");
     compare_node -> x = compare_cell[counter][0];
     compare_node -> y = compare_cell[counter][1];
+    m_log->message(2, "* adding pointer information:\n");
     compare_node -> shared_node_number = 0;
     compare_node -> inside = corner_inside2[counter];
-     m_log->message(2, "* testing the reference object before adding next[0]:\n");
-    reference.findNode(reference_node,2);
     compare_node -> next[0] = NULL;
-     m_log->message(2, "* testing the reference object after adding next[0]:\n");
-    reference.findNode(reference_node,2);
+    compare_node -> next[1] = NULL;
     compare_node -> next[2] = NULL;
 
-     m_log->message(2, "* before check: %p %15.10f \n", reference_node -> next[0], reference_node -> x);
+
 
     // call function that will replace the node with the equivalent reference node if they are at the same x,y point.
 
@@ -810,38 +820,61 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
     // test before function
 
-     m_log->message(2, "* testing the reference object before calling find_shared_node:\n");
-    reference.findNode(reference_node,2);
-    bool found_shared = find_shared_node(compare_node, reference);
+    m_log->message(2, "* checking reference: %p \n", reference); 
+
+//    bool found_shared = find_shared_node(compare_node, reference);
+
+     dummy = reference.findNode(reference_node,1);
+
+
+
+    int check_counter = 0;
+
+
+    bool continue_search = true;
+
+    bool found_shared = false;
+    while (continue_search) {
+
+     check_counter++;
+
+     m_log->message(2, "* attempting to find reference node: %5i %p \n", check_counter, reference); 
+     continue_search = reference.findNode(reference_node,check_counter);
+
+     if(continue_search && std::fabs(compare_node -> x - reference_node -> x) < epsilon && std::fabs(compare_node -> y - reference_node -> y) < epsilon) {
+
+      // compare_node = reference_node;
+       found_shared = true;
+       continue_search = false;
+      }
+
+    }
 
     
 
     if(found_shared) {
      corner_inside2[counter] =  true;
      compare_node -> inside = true;
-     m_log->message(2, "* found shared %p %15.10f \n", compare_node -> next[0], compare_node -> x);
+     delete compare_node;
+     compare.insertNode(reference_node,counter+1);
+     compare_node_count++;
+     m_log->message(2, "* found shared %p %p %15.10f %15.10f \n", compare_node -> next[0], compare_node -> next[1], compare_node -> x, compare_node -> y);
+    } else {
+     compare.insertNode(compare_node,counter+1);
+     compare_node_count++;
     }
 
-    m_log->message(2, "* adding compare_node %5i %2i \n", counter, found_shared); 
 
 
-    compare.insertNode(compare_node,counter+1);
-    compare_node_count++;
+    node * dummy_node = compare_node;
 
-    if(corner_inside1[counter] || corner_inside2[counter]) {
-      all_outside = false;
-    }
-
-    if(!corner_inside2[counter]) {
-
-      all_inside2 = false;
-
-    }
+     m_log->message(2, "* added compare node %p %p %15.10f %15.10f \n", compare_node -> next[0], compare_node -> next[1], compare_node -> x, compare_node -> y);
+    dummy = reference.findNode(reference_node,1);
 
     if(counter == 0) {  // create a full polygon this way 
 
-
-      node * compare_node = new node;
+      created_node = new node;
+      compare_node = created_node;
       compare_node -> x = compare_cell[counter][0];
       compare_node -> y = compare_cell[counter][1];
       compare_node -> shared_node_number = 0;
@@ -851,14 +884,15 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
       compare_node -> next[2] = NULL;
       compare.insertNode(compare_node,2);
       compare_node_count++;
-
-
+     m_log->message(2, "* added last node %p %p %15.10f %15.10f \n", dummy_node -> next[0], dummy_node -> next[1], dummy_node -> x, dummy_node -> y);
+    dummy = reference.findNode(reference_node,1);
+    dummy = compare.findNode(reference_node,1);
     }
 
   }
 
 
-  node * compare_node = new node;
+//  compare_node = new node;
   // find the crossover points
  
   // go back to the head
@@ -873,7 +907,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   int shared_node_number = 0;
 
-
+  node * crossover_node;
 
   while (not_finished) {
 
@@ -901,7 +935,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
         // now have two line segments, find out if they intersect
          m_log->message(2, "* do the lines overlap? ...\n");
-         node * crossover_node = new node;
+         created_node = new node;
+         crossover_node = created_node;
          is_crossover = find_crossover(reference_node, reference_node2, compare_node, compare_node2, crossover_node);
 
          if(is_crossover) {
@@ -939,17 +974,20 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   }
 
-
-
+  reference.findNode(reference_node,1);
+  compare.findNode(compare_node, 1);
 
   /// Doing something like the Weiler Atherton clipping algorithm https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_algorithm 
   // will require a linked list
 
   m_log->message(2, "* find the overlap ...\n");
   polygon_linked_list overlapping_polygon(3);
-  node * final_node = new node;
 
+  node * final_node;
+  node * append_node;
+  node * overlap_node;
   m_log->message(2, "* find water, %2i %2i ...\n", all_inside, all_inside2);
+
 
   if (all_inside && ! all_inside2) {
 
@@ -985,6 +1023,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
       if(reference_node -> inside && ! compare_node -> inside) { // reference node comes first
        overlapping_polygon.insertNode(reference_node,overlap_points);
        final_node = reference_node;
+       overlap_node = reference_node;
        found_first = true;
        use_reference = true;
        end_found = false;
@@ -993,6 +1032,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
        overlapping_polygon.insertNode(compare_node,overlap_points);
        final_node = compare_node;
+       overlap_node = compare_node;
        found_first = true;
        use_reference = false;
        end_found = false;
@@ -1000,6 +1040,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
        overlapping_polygon.insertNode(reference_node,overlap_points);
        final_node = reference_node;
+       overlap_node = reference_node;
        found_first = true;
        use_reference = true;
        end_found = false;
@@ -1020,9 +1061,44 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
    bool found_counter;
 
-   node * overlap_node = new node; 
+  // overlap_node = new node; 
    while(! end_found) {
 
+     m_log->message(2, "* searching ...\n");
+     reference_node = overlap_node -> next[0];
+     compare_node = overlap_node -> next[1];
+
+     m_log->message(2, "* nodes: %p %p %p %p\n", reference_node, compare_node, overlap_node, final_node);
+     if(reference_node != NULL) {
+       if (reference_node -> inside && reference_node != final_node) {
+         overlap_points++;
+         overlap_node = reference_node;
+         overlapping_polygon.insertNode(overlap_node,overlap_points);
+       } else {
+
+       end_found = true;
+       }
+
+     } else if(compare_node != NULL) {
+        m_log->message(2, "* compare node inside: %5i\n",compare_node -> inside);
+      if (compare_node -> inside && compare_node != final_node && compare_node ) {
+
+        m_log->message(2, "* compare node inside: %5i\n",compare_node -> inside);
+       overlap_points++;
+       overlap_node = compare_node;
+       overlapping_polygon.insertNode(overlap_node,overlap_points);
+      } else {
+
+       end_found = true;
+      }
+
+     } else {
+
+      end_found = true;
+     }
+
+
+/*
     if(use_reference) {
      counter++;
      found_node_reference = reference.findNode(reference_node, counter);
@@ -1106,7 +1182,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
     if (overlap_node -> next[0] == final_node || overlap_node -> next[1] == final_node) {
 
-     node * append_node = new node;
+     append_node = new node;
 
      append_node -> x = final_node -> x;
      append_node -> y = final_node -> y;
@@ -1120,14 +1196,18 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
      end_found = true;
     } // end if
-
+*/
    } // end while
 
    // TODO add function to calculate area of resulting polygon
 
    // for now, just set water to equal 1
 
+   if( overlap_points < 3) {
+    water = 0.0;
+   }else {
    water = 1.0;
+   }
 
   }
   
@@ -1230,19 +1310,20 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
 
 }
 
- bool HydrologyMod::find_shared_node(struct node *& node_check, polygon_linked_list &list_to_check) {
+ bool HydrologyMod::find_shared_node(struct node *& node_check, polygon_linked_list& list_to_check) {
 
   m_log->message(2,
              "* searching for shared node\n");
   double epsilon = 0.000001; // If the difference between the x and y values is sufficiently small, I consider the points to be equivalent
 
-  node * reference_node = new node;
+  node * reference_node;
 
   bool continue_search = true;
 
   int counter = 0;
 
-   m_log->message(2,"just checking things out:\n");
+   m_log->message(2,"just checking things out: %p %p %p\n", list_to_check, node_check, reference_node);
+  continue_search = list_to_check.findNode(reference_node,1);
  // list_to_check.findNode(reference_node,2);
 
   while (continue_search) {
@@ -1288,7 +1369,7 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
 
      // even-odd rule algorithm to determine if the point is inside or outside
 
-    if (std::min(polygon[current_point][1], polygon[next_point][1]) < y && std::max(polygon[current_point][1], polygon[next_point][1])) {
+    if (std::min(polygon[current_point][1], polygon[next_point][1]) < y && std::max(polygon[current_point][1], polygon[next_point][1]) >= y) {
 
      if (polygon[current_point][0] + (y - polygon[current_point][1]) / (polygon[next_point][1] - polygon[current_point][1]) * (polygon[next_point][0] - polygon[current_point][0]) < x) {
 
@@ -1298,6 +1379,12 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
 
     }
 
+  }
+
+  if(inside) {
+   m_log->message(2,"node is inside\n");
+  } else {
+      m_log->message(2,"node is outside, checking to see if it is on the edge\n");
   }
 
   if(!inside && on_edge) { // find out if the point is on the edge of the polygon
@@ -1316,6 +1403,12 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
     if(std::fabs(polygon[current_point][0] - polygon[next_point][0]) < epsilon) { // probably a vertical line
       if (std::fabs(x - std::fabs(polygon[current_point][0])) < epsilon) { // point has the same x, but is it in the range of y?
         if (y >= std::min(polygon[current_point][1],polygon[next_point][1]) && y <= std::min(polygon[current_point][1],polygon[next_point][1])) { // falls on the line
+
+        m_log->message(2,"node is presumably on the edge (vertical)\n");
+          m_log->message(2,"%15.10f %15.10f\n", x, y );
+        for(int current_point2=0; current_point2<polygon_size; current_point2++) {
+          m_log->message(2,"%15.10f %15.10f\n", polygon[current_point2][0], polygon[current_point2][1] );
+        }
          return true;
         }
       }
@@ -1324,7 +1417,12 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
       slope = (polygon[current_point][1] - polygon[next_point][1]) / (polygon[current_point][0] - polygon[next_point][0]);
       intercept = polygon[current_point][1] - polygon[current_point][0] * slope;
 
-      if(std::fabs(y - slope*x+intercept) < epsilon) {
+      if(std::fabs(y - (slope*x+intercept)) < epsilon) {
+        m_log->message(2,"node is presumably on the edge\n");
+          m_log->message(2,"%15.10f %15.10f %15.10f %15.10f %15.10f\n", x, y, y - slope*x+intercept, std::fabs(y - slope*x+intercept), epsilon );
+        for(int current_point2=0; current_point2<polygon_size; current_point2++) {
+          m_log->message(2,"%15.10f %15.10f\n", polygon[current_point2][0], polygon[current_point2][1] );
+        }
        return true;
       } // end if
 
@@ -1334,6 +1432,14 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
    } // end for
 
   } // end if
+
+  if(inside){
+        m_log->message(2,"node is presumably inside\n");
+          m_log->message(2,"%15.10f %15.10f\n", x, y);
+        for(int current_point2=0; current_point2<polygon_size; current_point2++) {
+          m_log->message(2,"%15.10f %15.10f\n", polygon[current_point2][0], polygon[current_point2][1] );
+        }
+  }
   return inside;
 }
 
@@ -1737,10 +1843,15 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
  }
 
 
- void polygon_linked_list::insertNode(struct node * newNode, int position ){
-
-  std::cout << "inside insertNode " << polygon_number << " " << position << " "  << listLength << "\n";
-
+ void polygon_linked_list::insertNode(struct node * newNode, int position, int polygon_number ){
+  if(polygon_number == 0) {
+    std::cout << "inside insertNode reference " << polygon_number << " " << position << " "  << listLength << "\n";
+  } else if (polygon_number == 1) {
+    std::cout << "inside insertNode compare " << polygon_number << " " << position << " "  << listLength << "\n";
+  } else {
+    std::cout << "inside insertNode overlap " << polygon_number << " " << position << " "  << listLength << "\n";
+  }
+  std::cout << "check head node: " << head << " " << head -> next[0] << " " << head -> next[1] << "\n";
   if ((position <= 0) || (position > listLength + 1)){
    //     m_log_local->message(2,"* There is something wrong with code to insert a node (1)!!!!\n");     
   } // end if
@@ -1753,11 +1864,19 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
   int count = 0;
   node * p = head;
-  node * q = head;
+  node * q = head -> next[polygon_number];
+  for (count=1; count<=listLength; count++){
+    std::cout << "pointer_check insert: " << q << " " << count << " " << q -> x << " " << q ->y << " " << q -> next[polygon_number] << "\n";
+    q = q -> next[polygon_number];
+  }
+
+  q = head -> next[polygon_number];
 
   std::cout << "adding node after head " << polygon_number << " " << position << " "  << listLength << "\n";
   std::cout << "x, y, inside: " << newNode -> x << " "  << newNode -> y << " "  << newNode -> inside << "\n";
-  while (q){ 
+
+  for (count=1; count<=listLength; count++){
+ 
     std::cout << "count " << count << " " << position << " " <<  q <<  "\n";
     if (count == position){
      std::cout << "attempting to add the pointer \n";
@@ -1769,13 +1888,13 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
     } // end if
     p = q;
     q = p -> next[polygon_number];
-    count++;
-  } // end while
+
+  } // end for
 
   std::cout << "adding node at the end of the list " << polygon_number << " " << position << " "  << listLength << "\n";
-  if (count == position){
+  if (position == listLength+1){
     p -> next[polygon_number] = newNode;
-    newNode -> next[polygon_number] = q;
+ //   newNode -> next[polygon_number] = q;
     listLength++;
     return;
   } // end if
@@ -1784,32 +1903,34 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
  
  } // end polygon_linked_list::insertNode
 
- bool polygon_linked_list::findNode(struct node *& node_out, int position) {
+ bool polygon_linked_list::findNode(struct node *& node_out, int position, int polygon_number) {
 
-
+  node_out = NULL;
   std::cout << "inside findNode " << polygon_number << " "  << position << " " << listLength << "\n";
+  std::cout << "check head node: " << head << " " << head -> next[0] << " " << head -> next[1] << "\n";
+   std::cout << "also check passed node: " << node_out <<  "\n"; 
   if ((position <= 0) || (position > listLength )){
-
+     std:: cout << "Returning false\n";
       return false;  
   } // end if
 
   int count = 0;
-  node * q = head;
+// std::cout << "checking the head node " << head << " " << head -> next[polygon_number] << "\n";
+
+  node * q = head -> next[polygon_number];
+
+
+
+  std::cout << "assigned q " << polygon_number << " " << q << "\n";
 
   for(count = 1; count <= listLength; count++){
 
-  }
-
-  std::cout << "assigned q " << polygon_number << "\n";
-
-  for(count = 1; count <= listLength; count++){
-
-  std::cout << "pointer_check: " << count << " " << q -> x << " " << q ->y << " " << q -> next[polygon_number] << "\n";
+  std::cout << "pointer_check: " << q << " " << count << " " << q -> x << " " << q ->y << " " << q -> next[polygon_number] << "\n";
   q = q -> next[polygon_number];
 
   }
 
-  q = head;
+  q = head -> next[polygon_number];
 
   for(count = 1; count <= listLength; count++){
    std::cout << "searching " << count << " " << position << " " << q -> x << "\n";
