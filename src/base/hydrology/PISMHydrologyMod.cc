@@ -463,7 +463,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   double area, total_area, distance;
   double  pi = 3.14159265358979323846;
 
-  double translate_center[3][3][2];
+  double translate_center[3][3][2], transformation[2][2][2];
 
   int x_counter, y_counter;
 
@@ -490,53 +490,127 @@ void HydrologyMod::update_impl(double t, double dt) {
     // first find the translation of the center of all the cells
 //    m_log->message(2,"* calculating the translation %5i %5i\n", i, j);
 
+//   m_log->message(2,"* check_sin_and_cos %5i %5i\n", i, j);
     for(x_counter=0; x_counter<3; x_counter++ ){
       for(y_counter=0; y_counter<3; y_counter++ ){ 
 
-       if(m_gradient_magnitude(i-x_counter-1,j-y_counter-1) > 0.0) {
-        translate_center[x_counter][y_counter][0] = cos(m_theta(i-x_counter-1,j-y_counter-1)); // translate x
-        translate_center[x_counter][y_counter][1] = sin(m_theta(i-x_counter-1,j-y_counter-1)); // translate y
-       } else {
-        translate_center[x_counter][y_counter][0] = 0.0; // translate x
-        translate_center[x_counter][y_counter][1] = 0.0; // translate y  
+
+
+       if(m_gradient_magnitude(i+x_counter-1,j+y_counter-1) > 0.0 && mask.icy(i+x_counter-1,j+y_counter-1)) {
+        translate_center[x_counter][y_counter][0] = cos(m_theta(i+x_counter-1,j+y_counter-1)); // translate x
+        translate_center[x_counter][y_counter][1] = sin(m_theta(i+x_counter-1,j+y_counter-1)); // translate y
+       } else{
+        translate_center[x_counter][y_counter][0] = 0; // translate x
+        translate_center[x_counter][y_counter][1] = 0; // translate y  
        }
+
+ //     m_log->message(2,"translate %5i %5i %15.10f %15.10f %15.10f\n",i+x_counter-1,j+y_counter-1, m_gradient_magnitude(i+x_counter-1,j+y_counter-1),  translate_center[x_counter][y_counter][0],translate_center[x_counter][y_counter][1]);
+
+ //      m_log->message(2,"%5i %5i %15.10f %15.10f\n", i+x_counter-1,j+y_counter-1, translate_center[x_counter][y_counter][0],translate_center[x_counter][y_counter][1]);
+
       }  // end for
     } // end for
 
 //    m_log->message(2,"* calculating the translation for each corner %5i %5i\n", i, j);
     // bottom left
 
-    bottom_left(i,j).u = ((translate_center[1][1][0] + translate_center[0][1][0]) / 2.0 + (translate_center[1][0][0] + translate_center[0][0][0]) / 2.0) / 2.0 - 0.5;
-    bottom_left(i,j).v = ((translate_center[1][1][1] + translate_center[0][1][1]) / 2.0 + (translate_center[1][0][1] + translate_center[0][0][1]) / 2.0) / 2.0 - 0.5;
-    quadrilateral[0][0] = bottom_left(i,j).u;
-    quadrilateral[0][1] = bottom_left(i,j).v;
+//    m_log->message(2,"* bottom left %5i %5i\n", i, j);
+
+
+    transformation[0][0][0] = translate_center[0][0][0];
+    transformation[0][0][1] = translate_center[0][0][1];
+    transformation[1][0][0] = translate_center[1][0][0];
+    transformation[1][0][1] = translate_center[1][0][1];
+    transformation[1][1][0] = translate_center[1][1][0];
+    transformation[1][1][1] = translate_center[1][1][1];
+    transformation[0][1][0] = translate_center[0][1][0];
+    transformation[0][1][1] = translate_center[0][1][1];
+/*
+       m_log->message(2,"translate %15.10f %15.10f\n", transformation[0][0][0],transformation[0][0][1]);
+       m_log->message(2,"translate %15.10f %15.10f\n", transformation[1][0][0],transformation[1][0][1]);
+       m_log->message(2,"translate %15.10f %15.10f\n", transformation[1][1][0],transformation[1][1][1]);
+       m_log->message(2,"translate %15.10f %15.10f\n", transformation[0][1][0],transformation[0][1][1]);
+*/
+    // calculate the affine transformation
+
+    affine_transformation(transformation,quadrilateral[0][0], quadrilateral[0][1]);
+
+    bottom_left(i,j).u = quadrilateral[0][0]-1.0;
+    bottom_left(i,j).v = quadrilateral[0][1]-1.0;
+
 
     // top left
+//    m_log->message(2,"* top left %5i %5i\n", i, j);
 
-    top_left(i,j).u = ((translate_center[1][1][0] + translate_center[0][1][0]) / 2.0 + (translate_center[1][2][0] + translate_center[0][2][0]) / 2.0) / 2.0 - 0.5;
-    top_left(i,j).v = ((translate_center[1][1][1] + translate_center[0][1][1]) / 2.0 + (translate_center[1][2][1] + translate_center[0][2][1]) / 2.0) / 2.0 + 0.5;
-    quadrilateral[1][0] = top_left(i,j).u;
-    quadrilateral[1][1] = top_left(i,j).v;
+    transformation[0][0][0] = translate_center[0][1][0];
+    transformation[0][0][1] = translate_center[0][1][1];
+    transformation[1][0][0] = translate_center[1][1][0];
+    transformation[1][0][1] = translate_center[1][1][1];
+    transformation[1][1][0] = translate_center[1][2][0];
+    transformation[1][1][1] = translate_center[1][2][1];
+    transformation[0][1][0] = translate_center[0][2][0];
+    transformation[0][1][1] = translate_center[0][2][1];
+
+    affine_transformation(transformation,quadrilateral[1][0], quadrilateral[1][1]);
+
+    top_left(i,j).u = quadrilateral[1][0]-1.0;
+    top_left(i,j).v = quadrilateral[1][1];
+
 
     // top right
+//    m_log->message(2,"* top right %5i %5i\n", i, j);
 
-    top_right(i,j).u = ((translate_center[1][1][0] + translate_center[2][1][0]) / 2.0 + (translate_center[1][2][0] + translate_center[2][2][0]) / 2.0) / 2.0 + 0.5;
-    top_right(i,j).v = ((translate_center[1][1][1] + translate_center[2][1][1]) / 2.0 + (translate_center[1][2][1] + translate_center[2][2][1]) / 2.0) / 2.0 + 0.5;
-    quadrilateral[2][0] = top_right(i,j).u;
-    quadrilateral[2][1] = top_right(i,j).v;
+
+    transformation[0][0][0] = translate_center[1][1][0];
+    transformation[0][0][1] = translate_center[1][1][1];
+    transformation[1][0][0] = translate_center[2][1][0];
+    transformation[1][0][1] = translate_center[2][1][1];
+    transformation[1][1][0] = translate_center[2][2][0];
+    transformation[1][1][1] = translate_center[2][2][1];
+    transformation[0][1][0] = translate_center[1][2][0];
+    transformation[0][1][1] = translate_center[1][2][1];
+
+
+    affine_transformation(transformation,quadrilateral[2][0], quadrilateral[2][1]);
+
+    top_right(i,j).u = quadrilateral[2][0];
+    top_right(i,j).v = quadrilateral[2][1];
+
 
 
     // bottom right
+//    m_log->message(2,"* bottom right %5i %5i\n", i, j);
 
-    bottom_right(i,j).u = ((translate_center[1][1][0] + translate_center[2][1][0]) / 2.0 + (translate_center[1][0][0] + translate_center[2][0][0]) / 2.0) / 2.0 + 0.5;
-    bottom_right(i,j).v = ((translate_center[1][1][1] + translate_center[2][1][1]) / 2.0 + (translate_center[1][0][1] + translate_center[2][0][1]) / 2.0) / 2.0 - 0.5;
-    quadrilateral[3][0] = bottom_right(i,j).u;
-    quadrilateral[3][1] = bottom_right(i,j).v;
+    transformation[0][0][0] = translate_center[1][0][0];
+    transformation[0][0][1] = translate_center[1][0][1];
+    transformation[1][0][0] = translate_center[2][0][0];
+    transformation[1][0][1] = translate_center[2][0][1];
+    transformation[1][1][0] = translate_center[2][1][0];
+    transformation[1][1][1] = translate_center[2][1][1];
+    transformation[0][1][0] = translate_center[1][1][0];
+    transformation[0][1][1] = translate_center[1][1][1];
+/*
+      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",0.0, 0.0, transformation[0][0][0]+double(i),transformation[0][0][1]+double(j)-1.0);
+      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",1.0, 0.0, transformation[1][0][0]+double(i)+1.0 ,transformation[1][0][1]+double(j)-1.0);
+      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",1.0, 1.0, transformation[1][1][0]+double(i)+1.0 ,transformation[1][1][1]+double(j));
+      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",0.0, 1.0, transformation[0][1][0]+double(i),transformation[0][1][1]+double(j));
+*/
+    affine_transformation(transformation,quadrilateral[3][0], quadrilateral[3][1]);
 
-//    m_log->message(2,"%15.10f %15.10f\n", bottom_left(i,j).u, bottom_left(i,j).v);
-//    m_log->message(2,"%15.10f %15.10f\n", top_left(i,j).u, top_left(i,j).v);
-//    m_log->message(2,"%15.10f %15.10f\n", top_right(i,j).u, top_right(i,j).v);  
-//    m_log->message(2,"%15.10f %15.10f\n", bottom_right(i,j).u, bottom_right(i,j).v);  
+
+    bottom_right(i,j).u = quadrilateral[3][0];
+    bottom_right(i,j).v = quadrilateral[3][1]-1.0;
+
+         m_log->message(2,"> %5i %5i\n", i, j);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_left(i,j).u, double(j) + bottom_left(i,j).v);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_left(i,j).u, double(j) + top_left(i,j).v);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_right(i,j).u, double(j) + top_right(i,j).v);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_right(i,j).u, double(j) + bottom_right(i,j).v);
+
+//    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, bottom_left(i,j).u, bottom_left(i,j).v);
+//    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, top_left(i,j).u, top_left(i,j).v);
+//    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, top_right(i,j).u, top_right(i,j).v);  
+ //   m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, bottom_right(i,j).u, bottom_right(i,j).v);  
 
 
     // TODO a check to make sure the translated quadralateral is regular? Probably shouldn't happen if the gradient is calculated correctly.
@@ -605,7 +679,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
 
-   if(mask.icy(i,j) ) {
+//   if(mask.icy(i,j) ) {
   //    m_log->message(2,"* icy: %5i %5i\n", i, j);
     // make a call to the formula 
     m_excess_water_playground(i,j) = 0.0;
@@ -625,7 +699,16 @@ void HydrologyMod::update_impl(double t, double dt) {
         compare_cell[3][0] = double(x_counter-1) + bottom_right(x_index,y_index).u; // bottom right
         compare_cell[3][1] = double(y_counter-1) + bottom_right(x_index,y_index).v;
 
+/*
+        if(x_counter == 1 && y_counter == 1) {
 
+         m_log->message(2,">\n");
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[0][0], double(j) + compare_cell[0][1]);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[1][0], double(j) + compare_cell[1][1]);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[2][0], double(j) + compare_cell[2][1]);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[3][0], double(j) + compare_cell[3][1]);
+       }
+*/
  /*
         m_log->message(2,"* calling calculate_water: %5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)));
         m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[0][0],  compare_cell[0][1], bottom_left(i,j).u, bottom_left(i,j).v);
@@ -643,7 +726,7 @@ void HydrologyMod::update_impl(double t, double dt) {
        m_excess_water_playground(i,j) = 1e-8;
      }
 
-   } // end if
+//   } // end if
   } // end for
 
   m_excess_water.copy_from(m_excess_water_playground);
@@ -652,6 +735,121 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
 }
+
+
+void HydrologyMod::affine_transformation(double transformation[2][2][2],double& x, double& y){
+
+ // from Heckbert 1989 (Fundamentals of texture mapping and image warping, page 20)
+
+ // make it a unit square
+
+
+ transformation[0][1][1] = transformation[0][1][1] + 1.0;
+ transformation[1][1][0] = transformation[1][1][0] + 1.0;
+ transformation[1][1][1] = transformation[1][1][1] + 1.0;
+ transformation[1][0][0] = transformation[1][0][0] + 1.0;
+/*
+ m_log->message(2,">  %15.10f %15.10f \n", transformation[0][0][0], transformation[0][0][1]);
+ m_log->message(2,">  %15.10f %15.10f \n", transformation[1][0][0], transformation[1][0][1]);
+ m_log->message(2,">  %15.10f %15.10f \n", transformation[1][1][0], transformation[1][1][1]);
+ m_log->message(2,">  %15.10f %15.10f \n", transformation[0][1][0], transformation[0][1][1]);
+*/
+
+
+   double epsilon = 0.000001;
+
+ // delta
+
+ 
+
+
+ double delta[3][2];
+ 
+ for(int counter=0; counter<=1; counter++){
+
+  delta[0][counter] = transformation[1][0][counter] - transformation[1][1][counter];
+  delta[1][counter] = transformation[0][1][counter] - transformation[1][1][counter];
+  delta[2][counter] = transformation[0][0][counter] - transformation[1][0][counter] + transformation[1][1][counter] - transformation[0][1][counter];
+ }
+
+ // create transformation matrix
+
+ double a_matrix[3][3];
+
+ double denom_left = delta[0][0] * delta[1][1];
+ double denom_right = delta[0][1] * delta[1][0];
+
+ if(std::fabs(denom_left - denom_right) > epsilon) { // should not cause numerical errors
+
+  a_matrix[2][0] = (delta[2][0] * delta[1][1] - delta[2][1] * delta[1][0]) / (denom_left - denom_right); // g
+  a_matrix[2][1] = (delta[0][0] * delta[2][1] - delta[0][1] * delta[2][0]) / (denom_left - denom_right); // h
+  a_matrix[2][2] = 1.0; // i
+
+  a_matrix[0][0] = transformation[1][0][0] - transformation[0][0][0] + a_matrix[2][0] * transformation[1][0][0]; // a
+  a_matrix[0][1] = transformation[0][1][0] - transformation[0][0][0] + a_matrix[2][1] * transformation[0][1][0]; // b
+  a_matrix[0][2] = transformation[0][0][0]; // c
+  a_matrix[1][0] = transformation[1][0][1] - transformation[0][0][1] + a_matrix[2][0] * transformation[1][0][1]; // d
+  a_matrix[1][1] = transformation[0][1][1] - transformation[0][0][1] + a_matrix[2][1] * transformation[0][1][1]; // e
+ a_matrix[1][2] = transformation[0][0][1]; // f
+ 
+
+
+
+  x = (0.5 * a_matrix[0][0] + 0.5 * a_matrix[0][1] + a_matrix[0][2]) / (0.5 * a_matrix[2][0] + 0.5 * a_matrix[2][1] + a_matrix[2][2]);
+  y = (0.5 * a_matrix[1][0] + 0.5 * a_matrix[1][1] + a_matrix[1][2]) / (0.5 * a_matrix[2][0] + 0.5 * a_matrix[2][1] + a_matrix[2][2]);
+//  m_log->message(2,"affine_result_proj: %15.10f %15.10f \n", x, y);
+ } else {
+
+  // do bilinear mapping instead
+
+  double a = transformation[0][0][0] - transformation[1][0][0] - transformation[0][1][0] + transformation[1][1][0];
+  double b = -transformation[0][0][0] + transformation[1][0][0];
+  double c = -transformation[0][0][0] + transformation[0][1][0];
+  double d = transformation[0][0][0];
+
+  double e = transformation[0][0][1] - transformation[1][0][1] - transformation[0][1][1] + transformation[1][1][1];
+  double f = -transformation[0][0][1] + transformation[1][0][1];
+  double g = -transformation[0][0][0] + transformation[0][1][1];
+  double h = transformation[0][0][1];
+
+  x = 0.5 * 0.5 * a + 0.5 * b + 0.5 * c + d;
+  y = 0.5 * 0.5 * e + 0.5 * f + 0.5 * g + h;
+
+//  m_log->message(2,"affine_result_bilinear: %15.10f %15.10f \n", x, y);
+/*
+
+  // most likely, y1 == y2 or x3 == x2
+
+  if(delta[0][1] < epsilon) { // y1 == y2
+
+   
+
+  } else if (delta[1][0] < epsilon) { // x3 == x2
+
+  } else {
+
+  }
+
+
+*/
+ }
+/*
+  m_log->message(2,"affine_result: 0.5 0.5  \n" );
+
+
+double temp_x, temp_y;
+ for(int counter=0; counter<=1; counter++){
+  for(int counter2=0; counter2<=1; counter2++){
+   temp_x = (double(counter) * a_matrix[0][0] + double(counter2) * a_matrix[0][1] + a_matrix[0][2]) / (double(counter) * a_matrix[2][0] + double(counter2) * a_matrix[2][1] + a_matrix[2][2]);
+   temp_y = (double(counter) * a_matrix[1][0] + double(counter2) * a_matrix[1][1] + a_matrix[1][2]) / (double(counter) * a_matrix[2][0] + double(counter2) * a_matrix[2][1] + a_matrix[2][2]);
+   m_log->message(2,">: %5i %5i  \n", counter, counter2);
+   m_log->message(2,">:  %15.10f %15.10f %15.10f %15.10f \n", temp_x, temp_y, transformation[counter][counter2][0], transformation[counter][counter2][1]);
+  }
+ }
+*/
+
+}
+
 
 double HydrologyMod::find_quad_area(double quadrilateral[4][2]) {
 
