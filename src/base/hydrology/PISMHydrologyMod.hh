@@ -60,6 +60,7 @@ public:
    bool findNode(struct node *& node_out, int position, int polygon_number);
    void create_node(struct node *& node_out);
    void print_polygon(int polygon_number);
+   double polygon_area(int polygon_number);
 private:
 
    node * head;
@@ -78,7 +79,6 @@ public:
   virtual void subglacial_water_thickness(IceModelVec2S &result) const;
 
   virtual void subglacial_water_pressure(IceModelVec2S &result) const;
-
 
 
 protected:
