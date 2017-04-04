@@ -533,7 +533,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 */
     // calculate the affine transformation
 
-    affine_transformation(transformation,quadrilateral[0][0], quadrilateral[0][1]);
+    projection_transformation(transformation,quadrilateral[0][0], quadrilateral[0][1]);
 
     bottom_left(i,j).u = quadrilateral[0][0]-1.0;
     bottom_left(i,j).v = quadrilateral[0][1]-1.0;
@@ -551,7 +551,7 @@ void HydrologyMod::update_impl(double t, double dt) {
     transformation[0][1][0] = translate_center[0][2][0];
     transformation[0][1][1] = translate_center[0][2][1];
 
-    affine_transformation(transformation,quadrilateral[1][0], quadrilateral[1][1]);
+    projection_transformation(transformation,quadrilateral[1][0], quadrilateral[1][1]);
 
     top_left(i,j).u = quadrilateral[1][0]-1.0;
     top_left(i,j).v = quadrilateral[1][1];
@@ -571,7 +571,7 @@ void HydrologyMod::update_impl(double t, double dt) {
     transformation[0][1][1] = translate_center[1][2][1];
 
 
-    affine_transformation(transformation,quadrilateral[2][0], quadrilateral[2][1]);
+    projection_transformation(transformation,quadrilateral[2][0], quadrilateral[2][1]);
 
     top_right(i,j).u = quadrilateral[2][0];
     top_right(i,j).v = quadrilateral[2][1];
@@ -595,7 +595,7 @@ void HydrologyMod::update_impl(double t, double dt) {
       m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",1.0, 1.0, transformation[1][1][0]+double(i)+1.0 ,transformation[1][1][1]+double(j));
       m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",0.0, 1.0, transformation[0][1][0]+double(i),transformation[0][1][1]+double(j));
 */
-    affine_transformation(transformation,quadrilateral[3][0], quadrilateral[3][1]);
+    projection_transformation(transformation,quadrilateral[3][0], quadrilateral[3][1]);
 
 
     bottom_right(i,j).u = quadrilateral[3][0];
@@ -737,7 +737,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 }
 
 
-void HydrologyMod::affine_transformation(double transformation[2][2][2],double& x, double& y){
+void HydrologyMod::projection_transformation(double transformation[2][2][2],double& x, double& y){
 
  // from Heckbert 1989 (Fundamentals of texture mapping and image warping, page 20)
 

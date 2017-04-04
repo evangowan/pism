@@ -89,7 +89,7 @@ protected:
   virtual void update_impl(double t, double dt);
 //  virtual std::map<std::string, Diagnostic::Ptr> diagnostics_impl() const;
 
-  virtual void affine_transformation(double transformation[2][2][2], double &x, double &y);
+  virtual void projection_transformation(double transformation[2][2][2], double &x, double &y);
   virtual double find_quad_area(double quadrilateral[4][2]);
   virtual double calculate_water(double reference_cell[4][2], double compare_cell[4][2]);
   virtual bool find_crossover(node *reference1, node *reference2, node *compare1, node *compare2, double& x, double& y);
