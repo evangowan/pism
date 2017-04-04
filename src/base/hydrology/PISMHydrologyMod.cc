@@ -480,6 +480,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   list.add(top_right);
   list.add(bottom_right);
   list.add(quad_area);
+  quad_area.set(1.0); // should be a unit cell outside of the icy area
 
   // calculate the translation of the grid cell's corners, to determine water content to surrounding cells
   for (Points p(*m_grid); p; p.next()) {
@@ -534,9 +535,10 @@ void HydrologyMod::update_impl(double t, double dt) {
     // calculate the affine transformation
 
     projection_transformation(transformation,quadrilateral[0][0], quadrilateral[0][1]);
-
-    bottom_left(i,j).u = quadrilateral[0][0]-1.0;
-    bottom_left(i,j).v = quadrilateral[0][1]-1.0;
+    quadrilateral[0][0] = quadrilateral[0][0]-1.0;
+    quadrilateral[0][1] = quadrilateral[0][1]-1.0;
+    bottom_left(i,j).u = quadrilateral[0][0];
+    bottom_left(i,j).v = quadrilateral[0][1];
 
 
     // top left
@@ -552,8 +554,8 @@ void HydrologyMod::update_impl(double t, double dt) {
     transformation[0][1][1] = translate_center[0][2][1];
 
     projection_transformation(transformation,quadrilateral[1][0], quadrilateral[1][1]);
-
-    top_left(i,j).u = quadrilateral[1][0]-1.0;
+    quadrilateral[1][0] = quadrilateral[1][0]-1.0;
+    top_left(i,j).u = quadrilateral[1][0];
     top_left(i,j).v = quadrilateral[1][1];
 
 
@@ -597,15 +599,11 @@ void HydrologyMod::update_impl(double t, double dt) {
 */
     projection_transformation(transformation,quadrilateral[3][0], quadrilateral[3][1]);
 
-
+    quadrilateral[3][1] = quadrilateral[3][1]-1.0;
     bottom_right(i,j).u = quadrilateral[3][0];
-    bottom_right(i,j).v = quadrilateral[3][1]-1.0;
+    bottom_right(i,j).v = quadrilateral[3][1];
 
-         m_log->message(2,"> %5i %5i\n", i, j);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_left(i,j).u, double(j) + bottom_left(i,j).v);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_left(i,j).u, double(j) + top_left(i,j).v);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_right(i,j).u, double(j) + top_right(i,j).v);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_right(i,j).u, double(j) + bottom_right(i,j).v);
+
 
 //    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, bottom_left(i,j).u, bottom_left(i,j).v);
 //    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, top_left(i,j).u, top_left(i,j).v);
@@ -619,6 +617,12 @@ void HydrologyMod::update_impl(double t, double dt) {
     // find the area of the quadralateral
 
     quad_area(i,j) = find_quad_area(quadrilateral);
+
+         m_log->message(2,"> %5i %5i %15.10f\n", i, j, quad_area(i,j));
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_left(i,j).u, double(j) + bottom_left(i,j).v);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_left(i,j).u, double(j) + top_left(i,j).v);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_right(i,j).u, double(j) + top_right(i,j).v);
+         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_right(i,j).u, double(j) + bottom_right(i,j).v);
 
    } else {
 
@@ -646,7 +650,7 @@ void HydrologyMod::update_impl(double t, double dt) {
     top_left(i,j).u = -0.5;
     top_left(i,j).v = 0.5;
 
-    quad_area(i,j) = 1;
+    quad_area(i,j) = 1.0;
   // m_log->message(2,"* finished not icy %5i %5i\n", i, j);
    } // end if (hope this is in the right spot
  
@@ -675,14 +679,15 @@ void HydrologyMod::update_impl(double t, double dt) {
   reference_cell[3][0] =  0.5; // bottom right
   reference_cell[3][1] = -0.5;
 
+  m_excess_water_playground.set(0.0);
    m_log->message(2,"* before calculate_water: \n");
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
 
 //   if(mask.icy(i,j) ) {
-  //    m_log->message(2,"* icy: %5i %5i\n", i, j);
+      m_log->message(2,"* icy: %5i %5i\n", i, j);
     // make a call to the formula 
-    m_excess_water_playground(i,j) = 0.0;
+
     for(x_counter=0; x_counter<3; x_counter++ ){
       for(y_counter=0; y_counter<3; y_counter++ ){ 
 
@@ -709,15 +714,16 @@ void HydrologyMod::update_impl(double t, double dt) {
          m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[3][0], double(j) + compare_cell[3][1]);
        }
 */
- /*
-        m_log->message(2,"* calling calculate_water: %5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)));
+
+        m_log->message(2,"* calling calculate_water: %5i %5i %5i %5i %15.10f %15.10f\n", i, j,i + (x_counter-1), j + (y_counter-1), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)));
         m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[0][0],  compare_cell[0][1], bottom_left(i,j).u, bottom_left(i,j).v);
         m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[1][0],  compare_cell[1][1], top_left(i,j).u, top_left(i,j).v);
         m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[2][0],  compare_cell[2][1], top_right(i,j).u, top_right(i,j).v);
         m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[3][0],  compare_cell[3][1], bottom_right(i,j).u, bottom_right(i,j).v);
-*/
+
         m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
      //   m_log->message(2,"* %5i %5i %5i %5i %15.10f %15.10f %15.10f %15.10f\n", i, j, x_counter-1, y_counter-1,calculate_water(reference_cell, compare_cell), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)), m_excess_water_playground(i,j));
+ m_log->message(2,"* after calculate_water : %5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i + (x_counter-1), j + (y_counter-1)),  m_excess_water_playground(i,j));
        } // end if
       } // end for
     } // end for
@@ -725,6 +731,8 @@ void HydrologyMod::update_impl(double t, double dt) {
      if (m_excess_water_playground(i,j) > 1e-8) { // fudge
        m_excess_water_playground(i,j) = 1e-8;
      }
+
+ m_log->message(2,"* finished calculate_water loop: %5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i , j),  m_excess_water_playground(i,j));
 
 //   } // end if
   } // end for
@@ -855,13 +863,13 @@ double HydrologyMod::find_quad_area(double quadrilateral[4][2]) {
 
 //  m_log->message(2,
 //             "* calculating quad area ...\n");
-  double a_x = quadrilateral[0][0] - quadrilateral[2][0];
-  double a_y = quadrilateral[0][1] - quadrilateral[2][1];
-  double b_x = quadrilateral[1][0] - quadrilateral[3][0];
-  double b_y = quadrilateral[1][1] - quadrilateral[3][1]; 
+  double p_x = quadrilateral[3][0] - quadrilateral[1][0];
+  double p_y = quadrilateral[3][1] - quadrilateral[1][1];
+  double q_x = quadrilateral[2][0] - quadrilateral[0][0];
+  double q_y = quadrilateral[2][1] - quadrilateral[0][1]; 
 
 
-  return fabs(a_x*b_y - a_y*b_x) * 0.5;
+  return fabs(p_x*q_y - p_y*q_x) * 0.5;
 
 }
 
@@ -1323,7 +1331,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      }
 
     }
- //    m_log->message(2, "* found the first node ...\n");
+     m_log->message(2, "* found the first node ...\n");
    // this should work assuming there isn't multiple overlapping polygons
 
 
@@ -1373,111 +1381,12 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      }
 
 
-/*
-    if(use_reference) {
-     counter++;
-     found_node_reference = reference.findNode(reference_node, counter);
-     if(found_node_reference && reference_node -> inside) {
-       m_log->message(2, "* found the overlapping node with reference %5i %15.10f %15.10f ...\n", counter,  reference_node -> x,  reference_node -> y);
-       overlap_points++;
-       overlapping_polygon.insertNode(reference_node,overlap_points);
-       m_log->message(2, "* node should be added ...\n");
-       overlap_node = reference_node;
-     } else { // switch to other polygon
-      counter = 1;
-      found_counter = false;
-
-      while(! found_counter) {
-       m_log->message(2, "* switch to compare ...\n");
-       found_node_compare = compare.findNode(compare_node, counter);
-       
-
-       std::cout << counter << " " << found_node_compare << " " << compare_node -> next[0] << " " << reference_node -> next[0] << " " << compare_node -> inside << " " << compare_node -> x << " " << compare_node -> y << "\n";
-       std::cout << "is there a shared node?" << " " << compare_node -> next[0] << " " << reference_node -> next[0] << " " << final_node -> next[0] << "\n";
-       std::cout << "is there a shared node?" << " " << compare_node -> next[1] << " " << reference_node -> next[1] << " " << final_node -> next[1] << "\n";
-       std::cout << "is there a shared node?" << " " << compare_node -> next[2] << " " << reference_node -> next[2] << " " << final_node -> next[2] << "\n";
-       if (! found_node_compare) {
-
-         found_counter = true;
-         end_found = true;
-
-       } else if(compare_node -> next[0] == reference_node -> next[0]){
-        found_counter = true;
-        use_reference = false;
-
-       } else {
-
-       counter++;
-       }     
-
-
-
-      }
-
-     }
-
-    } else {
-
-     counter++;
-     found_node_compare = compare.findNode(compare_node, counter);
-     if(found_node_compare && compare_node -> inside) {
-       m_log->message(2, "* found the overlapping node with compare ...\n");
-       overlap_points++;
-       overlapping_polygon.insertNode(compare_node,overlap_points);
-       overlap_node = compare_node;
-     } else { // switch to other polygon
-      counter = 1;
-      found_counter = false;
-
-      while(! found_counter) {
-       m_log->message(2, "* switch to reference ...\n");
-       found_node_reference = reference.findNode(reference_node, counter);
-       if (! found_node_compare) {
-
-         found_counter = true;
-         end_found = true;
-
-       } else if(compare_node -> next[0] == reference_node -> next[0]){
-        found_counter = true;
-        use_reference = true;
-
-       } else {
-
-       counter++;
-       }     
-
-
-      } // end while
-
-     } // end if
-
-    } // end if
-
-    // test if the current node is the last one
-
-    if (overlap_node -> next[0] == final_node || overlap_node -> next[1] == final_node) {
-
-     append_node = new node;
-
-     append_node -> x = final_node -> x;
-     append_node -> y = final_node -> y;
-     append_node -> inside = final_node -> inside;
-     append_node -> next[0] = NULL;
-     append_node -> next[1] = NULL;
-     append_node -> next[2] = NULL;
-
-     overlap_points++;
-     overlapping_polygon.insertNode(append_node,overlap_points);
-
-     end_found = true;
-    } // end if
-*/
    } // end while
 
    // TODO add function to calculate area of resulting polygon
 
    // for now, just set water to equal 1
-
+ m_log->message(2, "* overlapping points: ... %5i\n", overlap_points);
    if( overlap_points < 3) {
     water = 0.0;
    }else {
@@ -1487,7 +1396,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
   }
   
 
-//  m_log->message(2, "* amount of water: ... %15.10f\n", water);
+  m_log->message(2, "* amount of water: ... %15.10f\n", water);
 //  reference.print_polygon(0);
 //  reference.print_polygon(1); 
 //  reference.print_polygon(2);
