@@ -725,7 +725,7 @@ void HydrologyMod::update_impl(double t, double dt) {
     //    m_log->message(2, "+ %5i %5i\n", i, j); 
         m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
 
-      if(i  == 32 && j  == 19 ){
+      if(i  == 15 && j  == 32 && t > 2400.0 ){
 
       m_log->message(2,"+ %5i %5i %5i %5i %15.10f %15.10f %15.10f %15.10f\n", i, j, x_counter-1, y_counter-1,calculate_water(reference_cell, compare_cell,false), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)), calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1)));
      double dummy = calculate_water(reference_cell, compare_cell,true);
@@ -1167,7 +1167,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
    not_finished = reference.findNode(reference_node,reference_point,0);
  //  m_log->message(2, "* proceed through the while loop %d ...\n", not_finished);
-   if (not_finished) {
+ //  if (not_finished) {
 
     not_finished = reference.findNode(reference_node2,reference_point+1,0);
 
@@ -1196,12 +1196,12 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
         // crossover_node = created_node;
          double x, y;
          is_crossover = find_crossover(reference_node, reference_node2, compare_node, compare_node2, x, y);
-/*
+
       if(printing){
          m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f  %15.10f %15.10f %5i \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y, x, y, is_crossover);
          m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
       }
-*/
+
          if(is_crossover) {
 
            shared_node_number++;
@@ -1235,7 +1235,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
            }
            compare_point = 1;
-           reference_point = 1;
+           reference_point = 0;
            not_finished2 = false;
 
          } else {
@@ -1257,7 +1257,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
     }
 
-   }
+  // }
 
   }
 
@@ -1421,7 +1421,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
  if (printing){
  // reference.print_polygon(2);
  // m_log->message(2, "* amount of water: ... %15.10f\n", water);
-//  reference.print_polygon(0);
+  reference.print_polygon(0);
   reference.print_polygon(1); 
   reference.print_polygon(2);
 
