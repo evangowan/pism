@@ -678,12 +678,12 @@ void HydrologyMod::update_impl(double t, double dt) {
   reference_cell[2][1] =  0.5;
   reference_cell[3][0] =  0.5; // bottom right
   reference_cell[3][1] = -0.5;
-
+  double sum_excess_water = 0.0, sum_excess_water_playground = 0.0;
   m_excess_water_playground.set(0.0);
    m_log->message(2,"* before calculate_water: \n");
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
-
+    sum_excess_water += m_excess_water(i,j);
 //   if(mask.icy(i,j) ) {
 //      m_log->message(2,"* icy: %5i %5i\n", i, j);
     // make a call to the formula 
@@ -721,18 +721,40 @@ void HydrologyMod::update_impl(double t, double dt) {
         m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[2][0],  compare_cell[2][1], top_right(i,j).u, top_right(i,j).v);
         m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[3][0],  compare_cell[3][1], bottom_right(i,j).u, bottom_right(i,j).v);
 */
-        m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
-    //    m_log->message(2,"* %5i %5i %5i %5i %15.10f %15.10f %15.10f %15.10f\n", i, j, x_counter-1, y_counter-1,calculate_water(reference_cell, compare_cell), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)), m_excess_water_playground(i,j));
+
+    //    m_log->message(2, "+ %5i %5i\n", i, j); 
+        m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
+
+      if(i  == 32 && j  == 19 ){
+
+      m_log->message(2,"+ %5i %5i %5i %5i %15.10f %15.10f %15.10f %15.10f\n", i, j, x_counter-1, y_counter-1,calculate_water(reference_cell, compare_cell,false), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)), calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1)));
+     double dummy = calculate_water(reference_cell, compare_cell,true);
+     }
+
  //m_log->message(2,"* after calculate_water : %5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i + (x_counter-1), j + (y_counter-1)),  m_excess_water_playground(i,j));
        } // end if
       } // end for
     } // end for
 
+/*
+      if(m_excess_water_playground(i,j) > 0.0){
+         m_log->message(2,"> -Z%15.10f\n",  m_excess_water_playground(i,j));
+         m_log->message(2,"%15.10f %15.10f\n", double(i)-0.5, double(j)-0.5 );
+         m_log->message(2,"%15.10f %15.10f\n", double(i)-0.5, double(j)+0.5 );
+         m_log->message(2,"%15.10f %15.10f\n", double(i)+0.5, double(j)+0.5 );
+         m_log->message(2,"%15.10f %15.10f\n", double(i)+0.5, double(j)-0.5 );
+         m_log->message(2,"%15.10f %15.10f\n", double(i)-0.5, double(j)-0.5 );
+      }
+*/
      if (m_excess_water_playground(i,j) > 1e-8) { // fudge
        m_excess_water_playground(i,j) = 1e-8;
      }
 
-// m_log->message(2,"* finished calculate_water loop: %5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i , j),  m_excess_water_playground(i,j));
+
+    sum_excess_water_playground += m_excess_water_playground(i,j);
+ if(mask.icy(i,j)){
+// m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i , j)*1e8,  m_excess_water_playground(i,j)*1e8);
+}
 
 //   } // end if
   } // end for
@@ -740,7 +762,9 @@ void HydrologyMod::update_impl(double t, double dt) {
   m_excess_water.copy_from(m_excess_water_playground);
   m_log->message(2,
              "* finished calculating hydrology ...\n");
-
+  
+  m_log->message(2,
+             "* sums: ... %15.10f %15.10f\n",sum_excess_water,sum_excess_water_playground );
 
 }
 
@@ -836,7 +860,7 @@ double HydrologyMod::find_quad_area(double quadrilateral[4][2]) {
 
 }
 
-double HydrologyMod::calculate_water(double reference_cell[4][2], double compare_cell[4][2]) {
+double HydrologyMod::calculate_water(double reference_cell[4][2], double compare_cell[4][2], bool printing) {
 
   bool corner_inside1[4], corner_inside2[4];
 
@@ -1172,8 +1196,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
         // crossover_node = created_node;
          double x, y;
          is_crossover = find_crossover(reference_node, reference_node2, compare_node, compare_node2, x, y);
-
-
+      //   m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f  %15.10f %15.10f %5i \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y, x, y, is_crossover);
+     //    m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
 
          if(is_crossover) {
 
@@ -1205,21 +1229,23 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
             reference.insertNode(crossover_node,compare_point+1,1);
             compare_node_count++;
 
-            compare_point++;
+
            }
+           compare_point = 1;
+           reference_point = 1;
            not_finished2 = false;
 
          } else {
    //        m_log->message(2, "* no, they don't ...\n");
           compare_point++;
 
-         }
+         } // end is_crossover
 
 
 
 
 
-       }
+       } // end if not_finished2
 
       //}
 
@@ -1252,7 +1278,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
   node * overlap_node;
 //  m_log->message(2, "* find water, %2i %2i ...\n", all_inside, all_inside2);
 
-
+  all_inside = false; // fudge
+  all_inside2 = false;  // fudge
   if (all_inside && ! all_inside2) {
 
     // the reference cell is entirely contained within the compare cell
@@ -1387,13 +1414,15 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
    }
 
   }
-  
 
+ if (printing){
+ // reference.print_polygon(2);
  // m_log->message(2, "* amount of water: ... %15.10f\n", water);
 //  reference.print_polygon(0);
-//  reference.print_polygon(1); 
-//  reference.print_polygon(2);
+  reference.print_polygon(1); 
+  reference.print_polygon(2);
 
+ }
   // deallocate memory
  // m_log->message(2, "* deallocate overlapping_polygon ...\n");
 
@@ -1452,7 +1481,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
    if (fabs(compare1 -> x - compare2 -> x) < epsilon) { // assume that the line is vertical
  //    m_log->message(2, "*reference line is vertical: ...\n");
     x = compare1 -> x;
-    y = compare1 -> x * slope_reference + intercept_compare;
+    y = compare1 -> x * slope_reference + intercept_reference;
      
    } else { 
 
@@ -2169,15 +2198,22 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
  void polygon_linked_list::print_polygon(int polygon_number) {
 
   if(polygon_number == 0) {
-    std::cout << "reference: " << polygon_number << " "  << listLength[polygon_number] << "\n";
+   // std::cout << "reference: " << polygon_number << " "  << listLength[polygon_number] << "\n";
+   std::cout << "> -Z-1" << "\n";
   } else if (polygon_number == 1) {
-    std::cout << "compare: " << polygon_number << " "  << listLength[polygon_number] << "\n";
+   // std::cout << "compare: " << polygon_number << " "  << listLength[polygon_number] << "\n";
+   std::cout << "> -Z0" << "\n";
   } else {
-    std::cout << "overlap: " << polygon_number << " "  << listLength[polygon_number] << "\n";
+   std::cout << "> -Z1" << "\n";
+    if(listLength[polygon_number] == 0) {
+     return;
+    }
+
+//    std::cout << "overlap: " << polygon_number << " "  << listLength[polygon_number]+1 << "\n";
   }
 
   if(listLength[polygon_number] == 0) {
-   std:: cout << "no points \n";
+ //  std:: cout << "no points \n";
   } else {
 
    node * q = head -> next[polygon_number];
@@ -2185,16 +2221,21 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
    for(int count = 1; count <= listLength[polygon_number]; count++){
 
     if(q -> inside) {
-     std::cout << q -> x << " " << q ->y << " true " << q << "\n";
+     std::cout << q -> x << " " << q ->y << " true " << "\n";
+//     std::cout << q -> x << " " << q ->y << "\n";
     } else {
-     std::cout << q -> x << " " << q ->y << " false " << q << "\n";
+     std::cout << q -> x << " " << q ->y << " false "  << "\n";
+//     std::cout << q -> x << " " << q ->y << "\n";  
     }
     q = q -> next[polygon_number];
 
    }
   }
-  
-
+ 
+  if(polygon_number==2) {
+   node * q = head -> next[polygon_number];
+   std::cout << q -> x << " " << q ->y << "\n";
+  }
  }
 
  double polygon_linked_list::polygon_area(int polygon_number) {
@@ -2202,20 +2243,29 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
   // http://mathworld.wolfram.com/PolygonArea.html
 
   double area = 0.0;
-  if(listLength[polygon_number] > 2) {
+
+  double final_x, final_y;
+  if(listLength[polygon_number] > 1) { // by definition, the last node is not included
 
    node * q = head -> next[polygon_number];
+   final_x = q->x;
+   final_y = q->y;
    node * p = q -> next[polygon_number];
    
    for(int count = 1; count < listLength[polygon_number]; count++){
 
     area = area + q->x * p->y - q->y * p->x;
+  //  std::cout << "area sum: " << count << " " << area << " " <<  "\n";
     q = p;
     p = q -> next[polygon_number];   
 
    }
 
+   area = area + q->x * final_y - q->y * final_x;
+  //  std::cout << "area sum: " << listLength[polygon_number] << " " << area << " " <<  "\n";
    area = 0.5 * std::fabs(area);
+
+   // std::cout << "final sum: " << listLength[polygon_number] << " " << area << " " <<  "\n";
 
   }
   
@@ -2224,4 +2274,4 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
  }
 
 } // end namespace hydrology
-} // end namespace pism
+} // end namespace pism+;
