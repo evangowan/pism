@@ -1196,9 +1196,12 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
         // crossover_node = created_node;
          double x, y;
          is_crossover = find_crossover(reference_node, reference_node2, compare_node, compare_node2, x, y);
-      //   m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f  %15.10f %15.10f %5i \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y, x, y, is_crossover);
-     //    m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
-
+/*
+      if(printing){
+         m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f  %15.10f %15.10f %5i \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y, x, y, is_crossover);
+         m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
+      }
+*/
          if(is_crossover) {
 
            shared_node_number++;
@@ -1510,10 +1513,11 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
 
  //    m_log->message(2, "*x and y: %15.10f %15.10f\n", x, y);
   // check if the crossover is between the two lines, and not lying directly on one of the other nodes
-  if(x <= std::max(compare1 -> x, compare2 -> x) &&  x >= std::min(compare1 -> x, compare2 -> x) && 
-      y <= std::max(compare1 -> y, compare2 -> y) &&  y >= std::min(compare1 -> y, compare2 -> y) &&
-      x <= std::max(reference1 -> x, reference2 -> x) &&  x >= std::min(reference1 -> x, reference2 -> x) && 
-      y <= std::max(reference1 -> y, reference2 -> y) &&  y >= std::min(reference1 -> y, reference2 -> y)) {
+  // had to add an epsilon factor because it was failing if x1 == x2 or y1 == y2
+  if(x <= std::max(compare1 -> x, compare2 -> x)+epsilon &&  x >= std::min(compare1 -> x, compare2 -> x)-epsilon && 
+      y <= std::max(compare1 -> y, compare2 -> y)+epsilon &&  y >= std::min(compare1 -> y, compare2 -> y)-epsilon &&
+      x <= std::max(reference1 -> x, reference2 -> x)+epsilon &&  x >= std::min(reference1 -> x, reference2 -> x)-epsilon && 
+      y <= std::max(reference1 -> y, reference2 -> y)+epsilon &&  y >= std::min(reference1 -> y, reference2 -> y)-epsilon) {
  //    m_log->message(2, "* lines overlap: ...\n");
      return true;
   } else {
