@@ -1442,24 +1442,27 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
 }
 
+
+/*
+
+ Find crossover takes two lines as input and returns the crossover point, and whether or not the point lies on the input lines
+
+*/
 bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *compare1, node *compare2, double& x, double& y) {
 
 
   // if the nodes are equal, then by definition, there is no crossover
-  double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
+  double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical
 
+  // good reference for the problems with floating point math: https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
   if((std::fabs(reference1 -> x - compare1 -> x) < epsilon && std::fabs(reference1 ->y - compare1 -> y) < epsilon) || 
      (std::fabs(reference1 -> x - compare2 -> x) < epsilon && std::fabs(reference1 ->y - compare2 -> y) < epsilon) || 
      (std::fabs(reference2 -> x - compare1 -> x) < epsilon && std::fabs(reference2 ->y - compare1 -> y) < epsilon) || 
      (std::fabs(reference2 -> x - compare2 -> x) < epsilon && std::fabs(reference2 ->y - compare2 -> y) < epsilon)) {
 
-//   m_log->message(2, "*lines have a shared node: ...\n");
    return false;
   }
 
-
-
-  // good reference for the problems with floating point math: https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 
   double slope_reference, slope_compare, intercept_reference, intercept_compare;
 
@@ -1467,8 +1470,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
   if (fabs(reference1 -> x - reference2 -> x) < epsilon) {
    // also check the reference
    if (fabs(compare1 -> x - compare2 -> x) < epsilon) { // lines are likely parallel
-//     m_log->message(2, "*lines are considered to be parallel 1: ...\n");
-     return false; // right now no check of the lines completely overlap, should do that in another part of the program
+     return false; // right now no check of the lines completely overlap, should be handled in another part of the program (namely point_in_polygon)
    } else {
 
     slope_compare = (compare1 -> y - compare2 -> y) / (compare1 -> x - compare2 -> x);
@@ -1486,7 +1488,6 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
    intercept_reference = reference1 -> y - reference1 -> x * slope_reference;
 
    if (fabs(compare1 -> x - compare2 -> x) < epsilon) { // assume that the line is vertical
- //    m_log->message(2, "*reference line is vertical: ...\n");
     x = compare1 -> x;
     y = compare1 -> x * slope_reference + intercept_reference;
      
@@ -1496,8 +1497,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
     intercept_compare = compare1 -> y - compare1 -> x * slope_compare;
 
     if(fabs(slope_reference - slope_compare) < epsilon) { // lines are likely parallel
- //    m_log->message(2, "*lines are considered to be parallel 2: ...\n");
-      return false; // right now no check of the lines completely overlap, should do that in another part of the program
+      return false; // right now no check of the lines completely overlap, should be handled in another part of the program (namely point_in_polygon)
     }
 
     x = (intercept_reference - intercept_compare) / (slope_compare - slope_reference);
@@ -1507,25 +1507,16 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
 
   }
 
-/*
- &&
-     std::fabs( x - compare1 -> x) > epsilon && std::fabs( x - compare2 -> x) > epsilon &&
-     std::fabs( x - reference1 -> x) > epsilon && std::fabs( x - reference2 -> x) > epsilon &&
-     std::fabs( y - compare1 -> y) > epsilon && std::fabs( y - compare2 -> y) > epsilon &&
-     std::fabs( y - reference1 -> y) > epsilon && std::fabs( y - reference2 -> y) > epsilon
-*/
+  // check if the crossover point is between the two lines, and not lying directly on one of the other nodes
 
- //    m_log->message(2, "*x and y: %15.10f %15.10f\n", x, y);
-  // check if the crossover is between the two lines, and not lying directly on one of the other nodes
-  // had to add an epsilon factor because it was failing if x1 == x2 or y1 == y2
   if(x <= std::max(compare1 -> x, compare2 -> x)+epsilon &&  x >= std::min(compare1 -> x, compare2 -> x)-epsilon && 
       y <= std::max(compare1 -> y, compare2 -> y)+epsilon &&  y >= std::min(compare1 -> y, compare2 -> y)-epsilon &&
       x <= std::max(reference1 -> x, reference2 -> x)+epsilon &&  x >= std::min(reference1 -> x, reference2 -> x)-epsilon && 
       y <= std::max(reference1 -> y, reference2 -> y)+epsilon &&  y >= std::min(reference1 -> y, reference2 -> y)-epsilon) {
- //    m_log->message(2, "* lines overlap: ...\n");
+
      return true;
   } else {
-//     m_log->message(2, "* lines do not overlap: ...\n");
+
     return false;
 
   }
@@ -1538,46 +1529,6 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
   return false;
 
 }
-/*
- bool HydrologyMod::find_shared_node(struct node *& node_check, polygon_linked_list& list_to_check) {
-
-  m_log->message(2,
-             "* searching for shared node\n");
-  double epsilon = 0.000001; // If the difference between the x and y values is sufficiently small, I consider the points to be equivalent
-
-  node * reference_node;
-
-  bool continue_search = true;
-
-  int counter = 0;
-
-   m_log->message(2,"just checking things out: %p %p %p\n", list_to_check, node_check, reference_node);
-  continue_search = list_to_check.findNode(reference_node,1);
- // list_to_check.findNode(reference_node,2);
-
-  while (continue_search) {
-
-   counter++;
-
-   m_log->message(2,"Checking point: %5i\n", counter);
-   continue_search = list_to_check.findNode(reference_node,counter);
-   m_log->message(2,"x: %15.10f %15.10f \n", node_check -> x, reference_node -> x);
-   m_log->message(2,"y: %15.10f %15.10f \n", node_check -> y, reference_node -> y);
-   m_log->message(2,"inside: %2i %2i \n", node_check -> inside, reference_node -> inside);
-   m_log->message(2,"next: %p %p \n", node_check -> next[0], reference_node -> next[0]);
-
-   if(std::fabs(node_check -> x - reference_node -> x) < epsilon && std::fabs(node_check -> y - reference_node -> y) < epsilon) {
-
-    node_check = reference_node;
-    return true;
-
-   }
-  }
-
-  return false;
- }
-
-*/
 
 
 /*
