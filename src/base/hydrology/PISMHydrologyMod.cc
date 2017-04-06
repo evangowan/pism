@@ -1435,7 +1435,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
 
 
-  reference.~polygon_linked_list();
+ // reference.~polygon_linked_list();
 
   return water;
 
@@ -2020,13 +2020,13 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
  polygon_linked_list::~polygon_linked_list(){ // destructor
 
-/*
+
   for(int polygon_number = 0; polygon_number<=2; polygon_number++){
    node * p = head;
    node * q = head;
 
    int check1, check2, counter;
-   std::cout << "attempting to destruct " << polygon_number << "\n";
+ //  std::cout << "attempting to destruct " << polygon_number << "\n";
    counter = 0;
    bool continue_loop = true;
    while (continue_loop){
@@ -2037,7 +2037,7 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
     q = p -> next[polygon_number];
 
     if(p -> next[polygon_number]) {
-      std::cout << "not pointing to NULL " << counter << " " << polygon_number << "\n";
+//      std::cout << "not pointing to NULL " << counter << " " << polygon_number << "\n";
 
 
 
@@ -2053,16 +2053,16 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
      }
 
      if ( p -> next[check1] == NULL &&  p -> next[check2] == NULL ) { // safe to delete
-      std::cout << "destroying node " << counter << " " << listLength[polygon_number] << "\n";
+//      std::cout << "destroying node " << polygon_number << " " << counter << " " << listLength[polygon_number] << "\n";
        delete p;
      } else { // get rid of the pointer
-      std::cout << "leaving node where it is " << counter << " " << listLength[polygon_number] << "\n";
+ //     std::cout << "leaving node where it is " << polygon_number << " "  << counter << " " << listLength[polygon_number] << "\n";
       p -> next[polygon_number] = NULL; 
 
      }
 
     }else{
-      std::cout << "pointing to NULL " << counter << " " << polygon_number << "\n";
+ //     std::cout << "pointing to NULL " << polygon_number << " "  << counter << " " << polygon_number << "\n";
       continue_loop = false;
     }
 
@@ -2072,10 +2072,11 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
    }
 
-  std::cout << "finished destructing " << polygon_number << "\n";
+ // std::cout << "finished destructing " << polygon_number << "\n";
 
   }
-*/
+
+
  }
 
 
