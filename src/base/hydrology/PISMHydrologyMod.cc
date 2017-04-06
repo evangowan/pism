@@ -319,9 +319,6 @@ void HydrologyMod::update_impl(double t, double dt) {
   get_input_rate(t, dt, m_total_input); // retrieve the calculated input due to basal melting, etc
 
 
-
-  
-
   pressure_gradient(m_pressure_gradient,m_gradient_magnitude,m_theta); // find the basal pressure gradient
 
   // calculate till water flux with the given gradient magnitude
@@ -329,8 +326,6 @@ void HydrologyMod::update_impl(double t, double dt) {
   till_drainage(m_tillwat_flux, dt);
 
   // with the given input rate and till drainage, fill up the till with water
-
-  m_log->message(2, "* something something mask...\n");
 
   const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
 
@@ -347,7 +342,6 @@ void HydrologyMod::update_impl(double t, double dt) {
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
     flux_before= m_tillwat_flux(i,j);
- //     m_log->message(2, "* common vars...\n * dt: %10.8f \n * m_fraction_till: %7.2f \n * m_total_input %10.8f \n * m_tillwat_flux %10.8f \n", m_dt, m_fraction_till(i,j), m_total_input(i, j), m_tillwat_flux(i,j));
 
     if (mask.ocean(i,j) ) {
 
@@ -374,9 +368,6 @@ void HydrologyMod::update_impl(double t, double dt) {
        }
       }
 
-//      if(m_gradient_magnitude(i,j) < 1) { // any place where the gradient is zero, assume it is frozen to base with no till water. Probably later make this dependent on basal temperature
-//       flux_ratio = 0.0;
-//      }
       
       if(flux_ratio >= 1.0) {
         m_Wtil(i,j) = tillwat_max;
@@ -388,54 +379,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 
       m_excess_water(i,j) = m_total_input(i, j);
 
- //     m_log->message(2, "%5i %5i %15.10f %15.10f %15.10f \n", i, j, m_total_input(i, j), m_excess_water(i,j), flux_ratio  );
-
     } // end if
-
-/*
-    } else if (m_total_input(i, j)/m_fraction_till(i,j) < m_tillwat_flux(i,j)) {  
-
-      // the till water flux cannot be greater than the input
-
-      m_Wtil(i,j) = m_dt * m_total_input(i, j)/m_fraction_till(i,j);
-      
-
-      m_tillwat_flux(i,j) = m_total_input(i, j)/m_fraction_till(i,j);
-
-    } else {
-      
-      m_Wtil(i,j) = m_dt * m_total_input(i, j)/m_fraction_till(i,j);
-
-    }
-
-*/
-
-
-//    m_log->message(2, "* m_Wtil: %5i %5i %10.8f %15.10f %15.10f %15.10f \n ", i, j, m_Wtil(i,j), m_total_input(i, j)*m_dt, -m_tillwat_flux(i,j)*m_dt,m_gradient_magnitude(i,j)  );
-
-/*
-
-      if (m_Wtil(i,j) > tillwat_max) { // add the extra water to m_excess_water
-         if(m_gradient_magnitude(i,j) > 0.0) { // but only if the magnitude of the gradient is greater than 0, right not zero gradient means black hole
-
-           m_excess_water(i,j) = (m_total_input(i, j) - tillwat_max * m_fraction_till(i,j) / m_dt);
-         } else{
-           m_excess_water(i,j) = 0;
-         }
-         m_Wtil(i,j) = tillwat_max;
-
-      } else { // no excess water and the till is not full
-
-       m_excess_water(i,j) = 0;
-
-
-      }
-     if(mask.icy(i,j)){
- //    m_log->message(2, "* m_wtil: %5i %5i %10.8f %15.10f %15.10f %15.10f \n ", i, j, m_Wtil(i,j), m_excess_water(i,j), m_total_input(i, j)*m_dt, -m_tillwat_flux(i,j)*m_dt );
-
-    m_log->message(2, "* m_wtil: %5i %5i %15.10f %15.10f %15.10f \n ", i, j,m_total_input(i, j), flux_before, m_tillwat_flux(i,j) );
-    }
-*/
 
   } // end for
 
@@ -473,7 +417,6 @@ void HydrologyMod::update_impl(double t, double dt) {
 
   const IceModelVec2S &thk = *m_grid->variables().get_2d_scalar("thk");
   list.add(thk);
-   m_log->message(2,"* before cell translation: \n");
 
   list.add(bottom_left);
   list.add(top_left);
@@ -484,14 +427,10 @@ void HydrologyMod::update_impl(double t, double dt) {
 
   // calculate the translation of the grid cell's corners, to determine water content to surrounding cells
   for (Points p(*m_grid); p; p.next()) {
-    const int i = p.i(), j = p.j();
-//   m_log->message(2,"* before mask %5i %5i\n", i, j);
+   const int i = p.i(), j = p.j();
    if(mask.icy(i,j) ) {
 
     // first find the translation of the center of all the cells
-//    m_log->message(2,"* calculating the translation %5i %5i\n", i, j);
-
-//   m_log->message(2,"* check_sin_and_cos %5i %5i\n", i, j);
     for(x_counter=0; x_counter<3; x_counter++ ){
       for(y_counter=0; y_counter<3; y_counter++ ){ 
 
@@ -505,18 +444,12 @@ void HydrologyMod::update_impl(double t, double dt) {
         translate_center[x_counter][y_counter][1] = 0; // translate y  
        }
 
- //     m_log->message(2,"translate %5i %5i %15.10f %15.10f %15.10f\n",i+x_counter-1,j+y_counter-1, m_gradient_magnitude(i+x_counter-1,j+y_counter-1),  translate_center[x_counter][y_counter][0],translate_center[x_counter][y_counter][1]);
-
- //      m_log->message(2,"%5i %5i %15.10f %15.10f\n", i+x_counter-1,j+y_counter-1, translate_center[x_counter][y_counter][0],translate_center[x_counter][y_counter][1]);
-
       }  // end for
     } // end for
 
-//    m_log->message(2,"* calculating the translation for each corner %5i %5i\n", i, j);
+    // calculate the quadrilateral transformation
+
     // bottom left
-
-//    m_log->message(2,"* bottom left %5i %5i\n", i, j);
-
 
     transformation[0][0][0] = translate_center[0][0][0];
     transformation[0][0][1] = translate_center[0][0][1];
@@ -526,13 +459,8 @@ void HydrologyMod::update_impl(double t, double dt) {
     transformation[1][1][1] = translate_center[1][1][1];
     transformation[0][1][0] = translate_center[0][1][0];
     transformation[0][1][1] = translate_center[0][1][1];
-/*
-       m_log->message(2,"translate %15.10f %15.10f\n", transformation[0][0][0],transformation[0][0][1]);
-       m_log->message(2,"translate %15.10f %15.10f\n", transformation[1][0][0],transformation[1][0][1]);
-       m_log->message(2,"translate %15.10f %15.10f\n", transformation[1][1][0],transformation[1][1][1]);
-       m_log->message(2,"translate %15.10f %15.10f\n", transformation[0][1][0],transformation[0][1][1]);
-*/
-    // calculate the affine transformation
+
+
 
     projection_transformation(transformation,quadrilateral[0][0], quadrilateral[0][1]);
     quadrilateral[0][0] = quadrilateral[0][0]-1.0;
@@ -542,7 +470,6 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
     // top left
-//    m_log->message(2,"* top left %5i %5i\n", i, j);
 
     transformation[0][0][0] = translate_center[0][1][0];
     transformation[0][0][1] = translate_center[0][1][1];
@@ -560,8 +487,6 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
     // top right
-//    m_log->message(2,"* top right %5i %5i\n", i, j);
-
 
     transformation[0][0][0] = translate_center[1][1][0];
     transformation[0][0][1] = translate_center[1][1][1];
@@ -581,7 +506,6 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
     // bottom right
-//    m_log->message(2,"* bottom right %5i %5i\n", i, j);
 
     transformation[0][0][0] = translate_center[1][0][0];
     transformation[0][0][1] = translate_center[1][0][1];
@@ -591,12 +515,7 @@ void HydrologyMod::update_impl(double t, double dt) {
     transformation[1][1][1] = translate_center[2][1][1];
     transformation[0][1][0] = translate_center[1][1][0];
     transformation[0][1][1] = translate_center[1][1][1];
-/*
-      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",0.0, 0.0, transformation[0][0][0]+double(i),transformation[0][0][1]+double(j)-1.0);
-      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",1.0, 0.0, transformation[1][0][0]+double(i)+1.0 ,transformation[1][0][1]+double(j)-1.0);
-      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",1.0, 1.0, transformation[1][1][0]+double(i)+1.0 ,transformation[1][1][1]+double(j));
-      m_log->message(2,"translate %15.10f %15.10f %15.10f %15.10f\n",0.0, 1.0, transformation[0][1][0]+double(i),transformation[0][1][1]+double(j));
-*/
+
     projection_transformation(transformation,quadrilateral[3][0], quadrilateral[3][1]);
 
     quadrilateral[3][1] = quadrilateral[3][1]-1.0;
@@ -605,45 +524,28 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
 
-//    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, bottom_left(i,j).u, bottom_left(i,j).v);
-//    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, top_left(i,j).u, top_left(i,j).v);
-//    m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, top_right(i,j).u, top_right(i,j).v);  
- //   m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, bottom_right(i,j).u, bottom_right(i,j).v);  
-
-
     // TODO a check to make sure the translated quadralateral is regular? Probably shouldn't happen if the gradient is calculated correctly.
-
 
     // find the area of the quadralateral
 
     quad_area(i,j) = find_quad_area(quadrilateral);
-/*
-         m_log->message(2,"> %5i %5i %15.10f\n", i, j, quad_area(i,j));
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_left(i,j).u, double(j) + bottom_left(i,j).v);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_left(i,j).u, double(j) + top_left(i,j).v);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + top_right(i,j).u, double(j) + top_right(i,j).v);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + bottom_right(i,j).u, double(j) + bottom_right(i,j).v);
-*/
+
    } else {
 
-//   m_log->message(2,"* not icy %5i %5i\n", i, j);
     // bottom right
 
     bottom_right(i,j).u = 0.5;
     bottom_right(i,j).v = -0.5;
-//   m_log->message(2,"* finished bottom_right %5i %5i\n", i, j);
 
     // bottom left
 
     bottom_left(i,j).u = -0.5;
     bottom_left(i,j).v = -0.5;
 
-
     // top right
 
     top_right(i,j).u = 0.5;
     top_right(i,j).v = 0.5;
-
 
     // top left
 
@@ -651,14 +553,15 @@ void HydrologyMod::update_impl(double t, double dt) {
     top_left(i,j).v = 0.5;
 
     quad_area(i,j) = 1.0;
-  // m_log->message(2,"* finished not icy %5i %5i\n", i, j);
+
    } // end if (hope this is in the right spot
  
   } // end for
    m_log->message(2,"* after cell translation: \n");
 
 
-  // now that we know where the water spreads to, find how much goes into each cell
+
+  // calculate the transfer of water from a cell to neighbouring cells. This part could probably be run several times per time step, like in PISMRoutingHydrology
 
   // first update the ghosts
 
@@ -679,14 +582,12 @@ void HydrologyMod::update_impl(double t, double dt) {
   reference_cell[3][0] =  0.5; // bottom right
   reference_cell[3][1] = -0.5;
   double sum_excess_water = 0.0, sum_excess_water_playground = 0.0;
+
+
   m_excess_water_playground.set(0.0);
-   m_log->message(2,"* before calculate_water: \n");
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
     sum_excess_water += m_excess_water(i,j);
-//   if(mask.icy(i,j) ) {
-//      m_log->message(2,"* icy: %5i %5i\n", i, j);
-    // make a call to the formula 
 
     for(x_counter=0; x_counter<3; x_counter++ ){
       for(y_counter=0; y_counter<3; y_counter++ ){ 
@@ -704,63 +605,15 @@ void HydrologyMod::update_impl(double t, double dt) {
         compare_cell[3][0] = double(x_counter-1) + bottom_right(x_index,y_index).u; // bottom right
         compare_cell[3][1] = double(y_counter-1) + bottom_right(x_index,y_index).v;
 
-/*
-        if(x_counter == 1 && y_counter == 1) {
-
-         m_log->message(2,">\n");
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[0][0], double(j) + compare_cell[0][1]);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[1][0], double(j) + compare_cell[1][1]);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[2][0], double(j) + compare_cell[2][1]);
-         m_log->message(2,"%15.10f %15.10f\n", double(i) + compare_cell[3][0], double(j) + compare_cell[3][1]);
-       }
-*/
-/*
-        m_log->message(2,"* calling calculate_water: %5i %5i %5i %5i %15.10f %15.10f\n", i, j,i + (x_counter-1), j + (y_counter-1), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)));
-        m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[0][0],  compare_cell[0][1], bottom_left(i,j).u, bottom_left(i,j).v);
-        m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[1][0],  compare_cell[1][1], top_left(i,j).u, top_left(i,j).v);
-        m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[2][0],  compare_cell[2][1], top_right(i,j).u, top_right(i,j).v);
-        m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", compare_cell[3][0],  compare_cell[3][1], bottom_right(i,j).u, bottom_right(i,j).v);
-*/
-
-    //    m_log->message(2, "+ %5i %5i\n", i, j); 
         m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
-/*
-      if(i  == 17 && j  == 30 && t > 2060.0 * 365.0 * 24.0 * 3600.0 ){
-
-      m_log->message(2,"+ %5i %5i %5i %5i %15.10f %15.10f %15.10f %15.10f\n", i, j, x_counter-1, y_counter-1,calculate_water(reference_cell, compare_cell,false), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)), calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1)));
-     double dummy = calculate_water(reference_cell, compare_cell,true);
-     }
-*/
 
        } // end if
       } // end for
     } // end for
 
 
-
-
-/*
-      if(m_excess_water_playground(i,j) > 0.0){
-         m_log->message(2,"> -Z%15.10f\n",  m_excess_water_playground(i,j));
-         m_log->message(2,"%15.10f %15.10f\n", double(i)-0.5, double(j)-0.5 );
-         m_log->message(2,"%15.10f %15.10f\n", double(i)-0.5, double(j)+0.5 );
-         m_log->message(2,"%15.10f %15.10f\n", double(i)+0.5, double(j)+0.5 );
-         m_log->message(2,"%15.10f %15.10f\n", double(i)+0.5, double(j)-0.5 );
-         m_log->message(2,"%15.10f %15.10f\n", double(i)-0.5, double(j)-0.5 );
-      }
-*/
-/*
-     if (m_excess_water_playground(i,j) > 1e-8) { // fudge
-       m_excess_water_playground(i,j) = 1e-8;
-     }
-*/
-
     sum_excess_water_playground += m_excess_water_playground(i,j);
- if(mask.icy(i,j) && t > 1800.0 * 365.0 * 24.0 * 3600.0){
- //m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i , j)*1e8,  m_excess_water_playground(i,j)*1e8);
-}
 
-//   } // end if
   } // end for
 
   m_excess_water.copy_from(m_excess_water_playground);
@@ -770,7 +623,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   m_log->message(2,
              "* sums: ... %15.10f %15.10f\n",sum_excess_water,sum_excess_water_playground );
 
-}
+} // end function HydrologyMod::update_impl
 
 
 /*
