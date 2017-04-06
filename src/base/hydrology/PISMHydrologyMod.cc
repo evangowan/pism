@@ -1989,33 +1989,23 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
 }
 
+/*
+  linked list class
 
-// adding in the linked list class
-//class polygon_linked_list;
-
+  The purpose of this class is to create an object that contains the points of three polygons: one reference, one compare, and one overlapping.
+  The overlapping polygon is determined from comparing the shared nodes between the reference and compare polygon. Uses a 
+  Weiler-Atherton style clipping algorithm
+*/
  polygon_linked_list::polygon_linked_list(){ // constructor
 
-//  std::cout << "creating linked list " << "\n";
-//   log.message(2,"* creating linked list: %1i ...\n", number);
-
+   // initialize the number of points in the polygons to zero
    listLength[0] = 0;
    listLength[1] = 0;
    listLength[2] = 0;
 
-//  std::cout << "before head " << listLength << "\n";
+   //  create the head node
    create_node(head);
-/*
-   head = new node;
-   head -> x = 0.0;
-   head -> y = 0.0;
 
-   head -> next[0] = NULL;
-   head -> next[1] = NULL;
-   head -> next[2] = NULL;
-   head -> shared_node_number = 0;
-*/
-
-//  std::cout << "finished initializing polygon_linked_list "  << "\n";
  }
 
  polygon_linked_list::~polygon_linked_list(){ // destructor
@@ -2026,102 +2016,73 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
    node * q = head;
 
    int check1, check2, counter;
- //  std::cout << "attempting to destruct " << polygon_number << "\n";
    counter = 0;
    bool continue_loop = true;
    while (continue_loop){
     counter++;
     if(counter <= listLength[polygon_number]) {
 
-    p = q;
-    q = p -> next[polygon_number];
+     p = q;
+     q = p -> next[polygon_number];
 
-    if(p -> next[polygon_number]) {
-//      std::cout << "not pointing to NULL " << counter << " " << polygon_number << "\n";
+     if(p -> next[polygon_number]) {
+      if(polygon_number == 0) {
+       check1 = 1;
+       check2 = 2;
+      } else if (polygon_number == 1) {
+       check1 = 0;
+       check2 = 2;
+      } else {
+       check1 = 0;
+       check2 = 1;
+      } // end if
 
+      if ( p -> next[check1] == NULL &&  p -> next[check2] == NULL ) { // safe to delete
+        delete p;
+      } else { // get rid of the pointer
+       p -> next[polygon_number] = NULL; 
 
+      } // end if
 
-     if(polygon_number == 0) {
-      check1 = 1;
-      check2 = 2;
-     } else if (polygon_number == 1) {
-      check1 = 0;
-      check2 = 2;
-     } else {
-      check1 = 0;
-      check2 = 1;
-     }
-
-     if ( p -> next[check1] == NULL &&  p -> next[check2] == NULL ) { // safe to delete
-//      std::cout << "destroying node " << polygon_number << " " << counter << " " << listLength[polygon_number] << "\n";
-       delete p;
-     } else { // get rid of the pointer
- //     std::cout << "leaving node where it is " << polygon_number << " "  << counter << " " << listLength[polygon_number] << "\n";
-      p -> next[polygon_number] = NULL; 
-
-     }
-
-    }else{
- //     std::cout << "pointing to NULL " << polygon_number << " "  << counter << " " << polygon_number << "\n";
+     }else{
       continue_loop = false;
-    }
+     } // end if
 
     } else{
      continue_loop = false;
-    }
+    } // end if
 
-   }
+   } // end while
 
- // std::cout << "finished destructing " << polygon_number << "\n";
+  } // end for
 
-  }
+ } // end polygon_linked_list::~polygon_linked_list
 
+/*
 
- }
+ Function to insert a node into a given polygon (set by polygon_number). 
 
+*/
 
  void polygon_linked_list::insertNode(struct node * newNode, int position, int polygon_number ){
-  if(polygon_number == 0) {
-//    std::cout << "inside insertNode reference " << polygon_number << " " << position << " "  << listLength[polygon_number] << "\n";
-  } else if (polygon_number == 1) {
- //   std::cout << "inside insertNode compare " << polygon_number << " " << position << " "  << listLength[polygon_number] << "\n";
-  } else {
- //   std::cout << "inside insertNode overlap " << polygon_number << " " << position << " "  << listLength[polygon_number] << "\n";
-  }
-//  std::cout << "check head node: " << head << " " << head -> next[0] << " " << head -> next[1] << "\n";
-  if ((position <= 0) || (position > listLength[polygon_number] + 1)){
-   //     m_log_local->message(2,"* There is something wrong with code to insert a node (1)!!!!\n");     
-  } // end if
+
 
   if (head -> next[polygon_number] == NULL){
-//    std::cout << "attempting to add new pointer at head\n";
     head -> next[polygon_number] = newNode;
     listLength[polygon_number]++;
-//    std::cout << "added new pointer at head\n";
     return;
   } // end if
-//    std::cout << "attempting to add new pointer after head, checking first:\n";
+
   int count = 0;
   node * p = head;
   node * q = head -> next[polygon_number];
-  for (count=1; count<=listLength[polygon_number]; count++){
- //   std::cout << "pointer_check insert: " << q << " " << count << " " << q -> x << " " << q ->y << " " << q -> next[polygon_number] << "\n";
-    q = q -> next[polygon_number];
-  }
 
-  q = head -> next[polygon_number];
-
- // std::cout << "adding node after head " << polygon_number << " " << position << " "  << listLength[polygon_number] << "\n";
-//  std::cout << "x, y, inside: " << newNode -> x << " "  << newNode -> y << " "  << newNode -> inside << "\n";
 
   for (count=1; count<=listLength[polygon_number]; count++){
  
- //   std::cout << "count " << count << " " << position << " " <<  q <<  "\n";
     if (count == position){
- //    std::cout << "attempting to add the pointer \n";
       p -> next[polygon_number] = newNode;
       newNode -> next[polygon_number] = q;
- //    std::cout << "should be added \n";
       listLength[polygon_number]++;
       return;
     } // end if
@@ -2130,65 +2091,55 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
   } // end for
 
-//  std::cout << "adding node at the end of the list " << polygon_number << " " << position << " "  << listLength[polygon_number] << "\n";
   if (position == listLength[polygon_number]+1){
     p -> next[polygon_number] = newNode;
- //   newNode -> next[polygon_number] = q;
     listLength[polygon_number]++;
     return;
   } // end if
-  // couldn't add point for some reason
-//  m_log_local->message(2,"* There is something wrong with code to insert a node (2)!!!!\n");     
- 
+
  } // end polygon_linked_list::insertNode
+
+/*
+
+Function to find a given node for a given polygon (set by polygon_number)
+
+*/
 
  bool polygon_linked_list::findNode(struct node *& node_out, int position, int polygon_number) {
 
   node_out = NULL;
-//  std::cout << "inside findNode " << polygon_number << " "  << position << " " << listLength[polygon_number] << "\n";
- // std::cout << "check head node: " << head << " " << head -> next[0] << " " << head -> next[1] << "\n";
-//   std::cout << "also check passed node: " << node_out <<  "\n"; 
+
   if ((position <= 0) || (position > listLength[polygon_number] )){
-//     std:: cout << "Returning false\n";
-      return false;  
+    return false;  
   } // end if
 
   int count = 0;
-// std::cout << "checking the head node " << head << " " << head -> next[polygon_number] << "\n";
 
   node * q = head -> next[polygon_number];
-
-
-
-//  std::cout << "assigned q " << polygon_number << " " << q << "\n";
-
-  for(count = 1; count <= listLength[polygon_number]; count++){
-
-//  std::cout << "pointer_check: " << q << " " << count << " " << q -> x << " " << q ->y << " " << q -> next[polygon_number] << "\n";
-  q = q -> next[polygon_number];
-
-  }
 
   q = head -> next[polygon_number];
 
   for(count = 1; count <= listLength[polygon_number]; count++){
-//   std::cout << "searching " << count << " " << position << " " << q -> x << "\n";
-   if(count == position) {
- //    std::cout << "found, or at least it should be: \n";
- //    std::cout << "found: " << count << " " << q -> x << " " << q ->y << " " << q -> next[polygon_number] << "\n";
-      node_out = q;
 
- //    std::cout << "found: " << count << " " << node_out -> x << " " << node_out ->y << " " << node_out -> next[polygon_number] << "\n";
+   if(count == position) {
+      node_out = q;
       return true;
     } // end if
+
     q = q -> next[polygon_number];
 
   } // end while
 
-  //   std::cout << "didn't find: " << count << position << "\n";
   return false;
 
  } // end polygon_linked_list::findNode
+
+
+/*
+
+ function to create a new node. Note that this was necessary to ensure that the next array was always initialized to point to NULL
+
+*/
 
   void polygon_linked_list::create_node(struct node *& node_out){
 
@@ -2204,6 +2155,13 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
  }
 
+
+/*
+
+ Function to print out a give polygon. This is purely for debugging.
+
+*/
+
  void polygon_linked_list::print_polygon(int polygon_number) {
 
   if(polygon_number == 0) {
@@ -2213,12 +2171,11 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
    // std::cout << "compare: " << polygon_number << " "  << listLength[polygon_number] << "\n";
    std::cout << "> -Z0" << "\n";
   } else {
+   // std::cout << "overlap: " << polygon_number << " "  << listLength[polygon_number] << "\n";
    std::cout << "> -Z1" << "\n";
     if(listLength[polygon_number] == 0) {
      return;
     }
-
-//    std::cout << "overlap: " << polygon_number << " "  << listLength[polygon_number]+1 << "\n";
   }
 
   if(listLength[polygon_number] == 0) {
@@ -2231,10 +2188,8 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
 
     if(q -> inside) {
      std::cout << q -> x << " " << q ->y << " true " << "\n";
-//     std::cout << q -> x << " " << q ->y << "\n";
     } else {
      std::cout << q -> x << " " << q ->y << " false "  << "\n";
-//     std::cout << q -> x << " " << q ->y << "\n";  
     }
     q = q -> next[polygon_number];
 
@@ -2245,16 +2200,20 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
    node * q = head -> next[polygon_number];
    std::cout << q -> x << " " << q ->y << "\n";
   }
- }
+ } // end polygon_linked_list::print_polygon
+
+/*
+
+  Function to compute the area of a given polygon. Reference:  http://mathworld.wolfram.com/PolygonArea.html
+
+*/
 
  double polygon_linked_list::polygon_area(int polygon_number) {
-
-  // http://mathworld.wolfram.com/PolygonArea.html
 
   double area = 0.0;
 
   double final_x, final_y;
-  if(listLength[polygon_number] > 1) { // by definition, the last node is not included
+  if(listLength[polygon_number] > 1) { // by definition, the last node is not included, rather the first node is stored (to avoid problems with the overlapping polygon)
 
    node * q = head -> next[polygon_number];
    final_x = q->x;
@@ -2264,23 +2223,19 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
    for(int count = 1; count < listLength[polygon_number]; count++){
 
     area = area + q->x * p->y - q->y * p->x;
-  //  std::cout << "area sum: " << count << " " << area << " " <<  "\n";
     q = p;
     p = q -> next[polygon_number];   
 
    }
 
    area = area + q->x * final_y - q->y * final_x;
-  //  std::cout << "area sum: " << listLength[polygon_number] << " " << area << " " <<  "\n";
    area = 0.5 * std::fabs(area);
-
-   // std::cout << "final sum: " << listLength[polygon_number] << " " << area << " " <<  "\n";
 
   }
   
   return area;
 
- }
+ } // end polygon_linked_list::polygon_area
 
 } // end namespace hydrology
 } // end namespace pism+;
