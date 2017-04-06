@@ -773,25 +773,29 @@ void HydrologyMod::update_impl(double t, double dt) {
 }
 
 
+/*
+
+ Perform a transformation of a given x,y point using a quadrilateral that is assumed to be deformed from a unit square with the bottom
+ left corner being (0,0)
+
+ The input transformation array merely contains the translations of each corner
+
+ from Heckbert 1989 (Fundamentals of texture mapping and image warping, page 20)
+
+*/
+
 void HydrologyMod::projection_transformation(double transformation[2][2][2],double& x, double& y){
 
- // from Heckbert 1989 (Fundamentals of texture mapping and image warping, page 20)
+
 
  double epsilon = 0.0000001;
 
  // make it a unit square
 
-
  transformation[0][1][1] = transformation[0][1][1] + 1.0;
  transformation[1][1][0] = transformation[1][1][0] + 1.0;
  transformation[1][1][1] = transformation[1][1][1] + 1.0;
  transformation[1][0][0] = transformation[1][0][0] + 1.0;
-
-
- // delta
-
- 
-
 
  double delta[3][2];
  
@@ -820,17 +824,15 @@ void HydrologyMod::projection_transformation(double transformation[2][2][2],doub
   a_matrix[0][2] = transformation[0][0][0]; // c
   a_matrix[1][0] = transformation[1][0][1] - transformation[0][0][1] + a_matrix[2][0] * transformation[1][0][1]; // d
   a_matrix[1][1] = transformation[0][1][1] - transformation[0][0][1] + a_matrix[2][1] * transformation[0][1][1]; // e
- a_matrix[1][2] = transformation[0][0][1]; // f
+  a_matrix[1][2] = transformation[0][0][1]; // f
  
-
-
 
   x = (0.5 * a_matrix[0][0] + 0.5 * a_matrix[0][1] + a_matrix[0][2]) / (0.5 * a_matrix[2][0] + 0.5 * a_matrix[2][1] + a_matrix[2][2]);
   y = (0.5 * a_matrix[1][0] + 0.5 * a_matrix[1][1] + a_matrix[1][2]) / (0.5 * a_matrix[2][0] + 0.5 * a_matrix[2][1] + a_matrix[2][2]);
 
  } else {
 
-  // do bilinear mapping instead since there would be a divide by zero error with a projection
+  // do bilinear mapping instead since there would be a divide by zero error with a projection transformation
 
   double a = transformation[0][0][0] - transformation[1][0][0] - transformation[0][1][0] + transformation[1][1][0];
   double b = -transformation[0][0][0] + transformation[1][0][0];
@@ -850,10 +852,15 @@ void HydrologyMod::projection_transformation(double transformation[2][2][2],doub
 }
 
 
+/*
+
+ Find the area of a quadrilateral.
+
+ see equation 3 on http://mathworld.wolfram.com/Quadrilateral.html
+
+*/
 double HydrologyMod::find_quad_area(double quadrilateral[4][2]) {
 
-//  m_log->message(2,
-//             "* calculating quad area ...\n");
   double p_x = quadrilateral[3][0] - quadrilateral[1][0];
   double p_y = quadrilateral[3][1] - quadrilateral[1][1];
   double q_x = quadrilateral[2][0] - quadrilateral[0][0];
