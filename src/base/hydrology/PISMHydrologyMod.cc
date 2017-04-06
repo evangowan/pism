@@ -864,6 +864,16 @@ double HydrologyMod::find_quad_area(double quadrilateral[4][2]) {
 
 }
 
+/*
+
+ This function determines the about of area of the compare cell quadrilateral is within the reference cell polygon using the
+ Weiler–Atherton clipping algorithm. Perhaps  misnamed calling it "calculate_water", but this is a legacy of an earlier commit.
+ Although there is a lot of code here, it should not be computationally intensive given that these are only quadrilaterals.
+
+ 
+
+*/
+
 double HydrologyMod::calculate_water(double reference_cell[4][2], double compare_cell[4][2], bool printing) {
 
   bool corner_inside1[4], corner_inside2[4];
@@ -880,13 +890,10 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   double water;
 
-   double epsilon = 0.0000001;
-
-//  m_log->message(2, "* within_calculate_water ...\n");
+  double epsilon = 0.0000001;
 
   polygon_linked_list reference;
-//  polygon_linked_list compare(2);
- //   m_log->message(2, "* linked lists created ...\n");
+
   int reference_node_count = 0;
   int compare_node_count = 0;
 
@@ -899,20 +906,17 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   bool on_edge = true; // used in point_in_polygon to check if the point is on the edge of the reference polygon
 
-//  m_log->message(2, "* establish polygon lists ...\n");
+
   // first add all the points in the reference cell
   for(counter = 0; counter < polygon_size; counter++) {
 
-//     m_log->message(2, "* assigning points %5i \n", counter);
     // check if reference corner is inside the reference
     corner_inside1[counter] = point_in_polygon(compare_cell, polygon_size, reference_cell[counter][0], reference_cell[counter][1], on_edge);
 
     if(!corner_inside1[counter]) {
-//       m_log->message(2, "* turning off all inside %5i \n", corner_inside1[counter]);
-      all_inside = false;
-
+      all_inside = false; // if this remains true, it might be possible to skip some of the later steps
     }
-//    created_node = new node;
+    // add the node
     reference.create_node(created_node);
     reference_node =  created_node;
     reference_node -> x = reference_cell[counter][0];
@@ -922,48 +926,17 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
     reference.insertNode(reference_node,counter+1,0);
     reference_node_count++;
 
-//      m_log->message(2, "* adding reference_node %5i %2i %p %p \n", counter, corner_inside1[counter], reference_node, reference_node -> next[0]); 
-   /*
-    node * compare_node = new node;
-    compare_node -> x = compare_cell[counter][0];
-    compare_node -> y = compare_cell[counter][1];
-    compare_node -> shared_node_number = 0;
-    compare_node -> inside = corner_inside2[counter];
-    compare_node -> next[0] = NULL;
-    compare_node -> next[2] = NULL;
-    m_log->message(2, "* adding compare_node %5i \n", counter); 
-    compare.insertNode(compare_node,counter+1);
-    compare_node_count++;
-  */
-//     m_log->message(2, "* assigned points %5i \n", counter);
+    if(counter == 0) {  // create a full polygon this way, i.e. the final node that will point to NULL 
 
-    if(counter == 0) {  // create a full polygon this way 
-
-    //  created_node = new node;
       reference.create_node(created_node);
       reference_node =  created_node;
       reference_node -> x = reference_cell[counter][0];
       reference_node -> y = reference_cell[counter][1];
       reference_node -> inside = corner_inside1[counter];
       reference.insertNode(reference_node,2,0);
-  //    reference_node_count++;
- //     m_log->message(2, "* adding reference_node %5i %2i %p %p \n", counter, corner_inside1[counter], reference_node, reference_node -> next[0]); 
   
     }
-
-
-
-
-
   }
-
-
-//  reference_node = new node;
-
-//  m_log->message(2, "* object after insert reference: ... \n");
-//  reference.print_polygon(0);
-
- //    m_log->message(2, "* adding the compare object **********************************:\n");
 
 
   // next add the compare cell
@@ -971,100 +944,40 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
   for(counter = 0; counter < polygon_size; counter++) {
    node * compare_node;
 
-//   m_log->message(2, "* compare assigning points %5i \n", counter);
-
    corner_inside2[counter] = point_in_polygon(reference_cell, polygon_size, compare_cell[counter][0], compare_cell[counter][1], on_edge);
 
- //    m_log->message(2, "* after point_in_polygon %5i \n", corner_inside2[counter]);
 
     if(corner_inside1[counter] || corner_inside2[counter]) {
- //     m_log->message(2, "* all_outside should be false %5i \n", corner_inside2[counter]);
+     // If this remains true, then the polygons do not overlap, and the part where the overlapping polygon is determined can be skipped
       all_outside = false;
     }
 
     if(!corner_inside2[counter]) {
-//      m_log->message(2, "* all_inside2 should be false %5i \n", corner_inside2[counter]);
+     // if this remains true, it might be possible to skip some of the later steps
       all_inside2 = false;
 
     }
 
-//     m_log->message(2, "* testing the reference object before creating a new compare node:\n");
- //   reference.findNode(reference_node,1);
-//     m_log->message(2, "* before add node: %p %15.10f \n", reference_node -> next[0], reference_node -> x);
-
-/*
-    m_log->message(2, "* before creating node: \n");
-    bool dummy = reference.findNode(reference_node,2,0);
-    dummy = reference.findNode(compare_node,2,1);
-
-    created_node = NULL;
-    m_log->message(2, "* address of reference and compare nodes: %p %p %p\n", reference_node, compare_node, created_node);
-//    created_node = new node;
- //   created_node = new node;
- //   compare_node = created_node;
-  //  compare_node = new node;
-    reference.create_node(created_node);
-    reference.create_node(compare_node);
-    m_log->message(2, "* address of reference and compare nodes: %p %p %p\n", reference_node, compare_node, created_node);
-    dummy = reference.findNode(compare_node,2,1);
-    m_log->message(2, "* done checking, adding: %5i %15.10f\n", counter, compare_cell[counter][0] );
-    m_log->message(2, "* check pointer to x created: \n");
-    created_node -> x = compare_cell[counter][0];
-    m_log->message(2, "* check pointer to x compare:\n" );
-    compare_node -> x = compare_cell[counter][0];
-    compare_node -> y = compare_cell[counter][1];
-    m_log->message(2, "* adding pointer information:\n");
-    compare_node -> shared_node_number = 0;
-    compare_node -> inside = corner_inside2[counter];
-    compare_node -> next[0] = NULL;
-    compare_node -> next[1] = NULL;
-    compare_node -> next[2] = NULL;
-*/
-
-
-    // call function that will replace the node with the equivalent reference node if they are at the same x,y point.
-
-  //  reference.findNode(reference_node,1);
-
-
-    // test before function
-
-//    m_log->message(2, "* checking reference: %p \n", reference); 
-
-//    bool found_shared = find_shared_node(compare_node, reference);
-
-//     bool dummy = reference.findNode(reference_node,1,0);
-
-
-
     int check_counter = 0;
-
-
     bool continue_search = true;
-
     bool found_shared = false;
-    while (continue_search) {
+
+    // this loop searches to see if the current point is the same as one in the reference polygon
+    while (continue_search) { 
 
      check_counter++;
-
-  //   m_log->message(2, "* attempting to find reference node: %5i %p \n", check_counter, reference); 
      continue_search = reference.findNode(reference_node,check_counter,0);
 
      if(continue_search && std::fabs(compare_cell[counter][0] - reference_node -> x) < epsilon && std::fabs(compare_cell[counter][1] - reference_node -> y) < epsilon) {
-
-      // compare_node = reference_node;
        found_shared = true;
        continue_search = false;
       }
-
     }
 
-    
-
+    // add the node to the polygon
     if(found_shared) {
      corner_inside2[counter] =  true;
      reference_node -> inside = true;
- //    m_log->message(2, "* found shared \n");
      reference.insertNode(reference_node,counter+1,1);
      compare_node_count++;
 
@@ -1073,8 +986,6 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      compare_node -> x = compare_cell[counter][0];
      compare_node -> y = compare_cell[counter][1];
      compare_node -> inside = corner_inside2[counter];
-
-   //  m_log->message(2, "* found non-overlapping %p %p %15.10f %15.10f \n", compare_node -> next[0], compare_node -> next[1], compare_node -> x, compare_node -> y);
      reference.insertNode(compare_node,counter+1,1);
      compare_node_count++;
 
@@ -1089,12 +1000,11 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
        before_done = reference.findNode(reference_node,reference_count,0);
        before_done = reference.findNode(reference_node2,reference_count+1,0);
        if(before_done) {
-  //      m_log->message(2, "* checking: %15.10f %15.10f %15.10f %15.10f %15.10f %15.10f \n", reference_node -> x, reference_node -> y, reference_node2 -> x, reference_node2 -> y, compare_node -> x, compare_node -> y  );
+
         if(std::fabs(reference_node -> x - reference_node2 -> x) < epsilon) { // vertical line
          if(std::fabs(reference_node -> x - compare_node -> x) < epsilon) { // falls on the line
           if (std::fabs(reference_node -> y - compare_node -> y) > epsilon && std::fabs(reference_node2 -> y - compare_node -> y) > epsilon) { // should fall between the lines
            reference.insertNode(compare_node,reference_count+1,0);
-          // m_log->message(2, "* found overlap:\n");
            before_done = false;
           }
          }
@@ -1104,9 +1014,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
           double slope = (reference_node -> y - reference_node2 -> y) /  (reference_node -> x - reference_node2 -> x);
           double intercept = reference_node -> y - slope * reference_node -> x;
           double temp_y = slope * compare_node -> x + intercept;
-          if(std::fabs(compare_node -> y - temp_y) < epsilon ) { // sould overlap
+          if(std::fabs(compare_node -> y - temp_y) < epsilon ) { // should overlap
            reference.insertNode(compare_node,reference_count+1,0);
-         //  m_log->message(2, "* found overlap:\n");
            before_done = false;
           }
          }
@@ -1121,7 +1030,6 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
     if(counter == 0) {  // create a full polygon this way 
 
-  //    created_node = new node;
       reference.create_node(created_node);
       compare_node = created_node;
       compare_node -> x = compare_cell[counter][0];
@@ -1129,33 +1037,13 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
       compare_node -> inside = corner_inside2[counter];
       reference.insertNode(compare_node,2,1);
       compare_node_count++;
- //    m_log->message(2, "* added last node %p %p %15.10f %15.10f \n", compare_node -> next[0], compare_node -> next[1], compare_node -> x, compare_node -> y);
- //   dummy = reference.findNode(reference_node,1,0);
- //   dummy = reference.findNode(reference_node,1,1);
     }
-
   }
-
-
-//  m_log->message(2, "* object after insert compare: ... \n");
-//  reference.print_polygon(0);
-//  reference.print_polygon(1);
 
   node * compare_node;
 
-//  compare_node = new node;
-  // find the crossover points
+  // find and add the crossover points
  
-  // go back to the head
-/*
-  m_log->message(2, "* find the crossover points ...\n");
-     m_log->message(2, "* found the first node ...\n");
-   // this should work assuming there isn't multiple overlapping polygons
-     m_log->message(2, "* reference ...\n");
-  reference.print_polygon(0);
-     m_log->message(2, "* compare ...\n");
-  reference.print_polygon(1);
-*/
   bool not_finished = true;
   bool not_finished2;
   bool is_crossover;
@@ -1169,10 +1057,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   while (not_finished) {
 
-   not_finished = reference.findNode(reference_node,reference_point,0);
- //  m_log->message(2, "* proceed through the while loop %d ...\n", not_finished);
- //  if (not_finished) {
-
+    not_finished = reference.findNode(reference_node,reference_point,0);
     not_finished = reference.findNode(reference_node2,reference_point+1,0);
 
     if (not_finished) {
@@ -1184,27 +1069,19 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      while(not_finished2) {
  
       not_finished2 = reference.findNode(compare_node,compare_point,1);
-
-      //if(not_finished2) {
-
        not_finished2 = reference.findNode(compare_node2,compare_point+1,1);
 
        if(not_finished2) {
 
         // now have two line segments, find out if they intersect
-    //     m_log->message(2, "* do the lines overlap? ...\n");
-   //      m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y);
-   //      m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
-     //    created_node = new node;
-      //   reference.create_node(created_node);
-        // crossover_node = created_node;
          double x, y;
          is_crossover = find_crossover(reference_node, reference_node2, compare_node, compare_node2, x, y);
 
-      if(printing){
-         m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f  %15.10f %15.10f %5i \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y, x, y, is_crossover);
-         m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
-      }
+         // for debugging
+         if(printing){
+          m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f  %15.10f %15.10f %5i \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y, x, y, is_crossover);
+          m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
+         }
 
          if(is_crossover) {
 
@@ -1243,68 +1120,45 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
            not_finished2 = false;
 
          } else {
-   //        m_log->message(2, "* no, they don't ...\n");
           compare_point++;
 
-         } // end is_crossover
+         } // end if
 
+       } // end if
 
-
-
-
-       } // end if not_finished2
-
-      //}
-
-     }
+     } // end while
       reference_point++;
 
-    }
+    } // end if
 
-  // }
+  } // end while
 
-  }
-
-//  reference.findNode(reference_node,1,0);
-//  reference.findNode(compare_node, 1,1);
-
-
-//  m_log->message(2, "* object after insert nodes: ... \n");
-//  reference.print_polygon(0);
-//  reference.print_polygon(1);
-
-
-  /// Doing something like the Weiler Atherton clipping algorithm https://en.wikipedia.org/wiki/Weiler%E2%80%93Atherton_clipping_algorithm 
-  // will require a linked list
-
- // m_log->message(2, "* find the overlap ...\n");
-//  polygon_linked_list overlapping_polygon(3);
 
   node * final_node;
   node * append_node;
   node * overlap_node;
-//  m_log->message(2, "* find water, %2i %2i ...\n", all_inside, all_inside2);
 
+
+  // Create the overlapping nodes and determine the area.
+
+  // I think it should be possible to skip this if one polygon is completely within the other.  I'm unsure if this is safe, so I am disabling this for now
   all_inside = false; // fudge
   all_inside2 = false;  // fudge
   if (all_inside && ! all_inside2) {
 
     // the reference cell is entirely contained within the compare cell
-//  m_log->message(2, "* the reference cell is entirely contained within the compare cell ...\n");
     water = find_quad_area(reference_cell) / find_quad_area(compare_cell);
 
   } else if (all_inside2 && ! all_inside){
 
     // the compare cell is entirely contained within the reference cell
-//  m_log->message(2, "* the compare cell is entirely contained within the reference cell ...\n");
     water = find_quad_area(compare_cell);
 
   } else {
 
     // part of the compare cell is in the reference cell
 
-    // start by grabbing the first node of the reference cell
- //    m_log->message(2, "* attempting to find the first node ...\n");
+    // start by grabbing the first node that is considered "inside"
 
     int counter = 1, overlap_points = 1;
     bool found_first = false;
@@ -1313,7 +1167,6 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
     bool end_found;
     while(! found_first) {
 
- //    m_log->message(2, "* trying to find first node ...\n");
      found_node_reference = reference.findNode(reference_node, counter,0);
      found_node_compare = reference.findNode(compare_node, counter,1);
 
@@ -1353,30 +1206,17 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      }
 
     }
-/*
-     m_log->message(2, "* found the first node ...\n");
-   // this should work assuming there isn't multiple overlapping polygons
-     m_log->message(2, "* reference ...\n");
-  reference.print_polygon(0);
-     m_log->message(2, "* compare ...\n");
-  reference.print_polygon(1);
-*/
+
    bool found_counter;
 
-  // overlap_node = new node; 
+   // if there is an overlap, this is executed
    while(! end_found) {
 
- //    m_log->message(2, "* searching ...\n");
      reference_node = overlap_node -> next[0];
      compare_node = overlap_node -> next[1];
 
- //    m_log->message(2, "* nodes: %p %p %p %p\n", reference_node, compare_node, overlap_node, final_node);
-     
-
      if(reference_node != NULL && reference_node ->next[0] !=NULL && reference_node -> inside) {
-//       m_log->message(2, "* reference: %15.10f %15.10f %p\n", reference_node ->x, reference_node ->y, reference_node);
- //      m_log->message(2, "* final: %15.10f %15.10f %p\n", final_node ->x, final_node ->y, final_node);
- //       m_log->message(2, "* reference node inside: %5i\n",reference_node -> inside);
+
        if (reference_node != final_node) {
          overlap_points++;
          overlap_node = reference_node;
@@ -1387,12 +1227,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
        }
 
      } else if(compare_node != NULL && compare_node ->next[1] !=NULL && compare_node -> inside) {
-//       m_log->message(2, "* compare: %15.10f %15.10f %p\n", compare_node ->x, compare_node ->y, reference_node);
- //      m_log->message(2, "* final: %15.10f %15.10f %p\n", final_node ->x, final_node ->y, final_node);
-//        m_log->message(2, "* compare node inside: %5i\n",compare_node -> inside);
-      if (compare_node != final_node ) {
 
- //       m_log->message(2, "* compare node inside: %5i\n",compare_node -> inside);
+      if (compare_node != final_node ) {
        overlap_points++;
        overlap_node = compare_node;
        reference.insertNode(overlap_node,overlap_points,2);
@@ -1409,11 +1245,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
    } // end while
 
-   // TODO add function to calculate area of resulting polygon
-
-
-   // for now, just set water to equal 1
-// m_log->message(2, "* overlapping points: ... %5i\n", overlap_points);
+   // call function to calculate area of resulting polygon (if it is a polygon)
    if( overlap_points < 3) {
     water = 0.0;
    }else {
@@ -1422,25 +1254,20 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   }
 
+ // for debugging
  if (printing){
- // reference.print_polygon(2);
- // m_log->message(2, "* amount of water: ... %15.10f\n", water);
+
   reference.print_polygon(0);
   reference.print_polygon(1); 
   reference.print_polygon(2);
 
  }
-  // deallocate memory
- // m_log->message(2, "* deallocate overlapping_polygon ...\n");
 
-
-
- // reference.~polygon_linked_list();
 
   return water;
 
 
-}
+} // end function HydrologyMod::calculate_water
 
 
 /*
@@ -1528,7 +1355,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
 
   return false;
 
-}
+} // end function HydrologyMod::find_crossover
 
 
 /*
@@ -1559,9 +1386,7 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
       inside = ! inside;
 
      }
-
     }
-
   }
 
   if(!inside && on_edge) { // find out if the point is on the edge of the polygon
@@ -1603,7 +1428,7 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
 
 
   return inside;
-}
+} // end function HydrologyMod::point_in_polygon
 
 // put variables you want to output to file in these functions
 void HydrologyMod::define_model_state_impl(const PIO &output) const {
