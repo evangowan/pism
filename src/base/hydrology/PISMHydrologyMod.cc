@@ -1579,15 +1579,17 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
 
 */
 
-bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, double x, double y, bool on_edge ) {
 
-  // second index of polygon should be size 2 (for x and y), the other index is polygon_size
+/*
+
+ Function to determine whether or not a given point is within a given polygon. Also optional check to see if the point is on the edge of a polygon
+
+*/
+bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, double x, double y, bool on_edge ) {
 
   bool inside = false;
 
   int current_point, next_point;
-
-
 
   for(current_point=0; current_point<polygon_size; current_point++) {
 
@@ -1611,15 +1613,9 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
 
   }
 
-  if(inside) {
-//   m_log->message(2,"node is inside: %15.10f %15.10f\n", x, y);
-  } else {
-  //    m_log->message(2,"node is outside, checking to see if it is on the edge\n");
-  }
-
   if(!inside && on_edge) { // find out if the point is on the edge of the polygon
 
-   double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
+   double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical
    double slope, intercept;
 
    for(current_point=0; current_point<polygon_size; current_point++) {
@@ -1633,29 +1629,16 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
     if(std::fabs(polygon[current_point][0] - polygon[next_point][0]) < epsilon) { // probably a vertical line
       if (std::fabs(x - std::fabs(polygon[current_point][0])) < epsilon) { // point has the same x, but is it in the range of y?
         if (y >= std::min(polygon[current_point][1],polygon[next_point][1]) && y <= std::min(polygon[current_point][1],polygon[next_point][1])) { // falls on the line
-
-    //    m_log->message(2,"node is presumably on the edge (vertical)\n");
-   //       m_log->message(2,"%15.10f %15.10f\n", x, y );
-        for(int current_point2=0; current_point2<polygon_size; current_point2++) {
-     //     m_log->message(2,"%15.10f %15.10f\n", polygon[current_point2][0], polygon[current_point2][1] );
-        }
-    //   m_log->message(2,"node is on edge 1: %15.10f %15.10f\n", x, y);
          return true;
         }
       }
-    } else {
+    } else { // can safely find the slope of the line without a divide by zero error
 
       slope = (polygon[current_point][1] - polygon[next_point][1]) / (polygon[current_point][0] - polygon[next_point][0]);
       intercept = polygon[current_point][1] - polygon[current_point][0] * slope;
       double temp_y = slope*x+intercept;
 
       if(std::fabs(y - temp_y) < epsilon && x >= std::min(polygon[current_point][0],polygon[next_point][0]) && x <= std::max(polygon[current_point][0],polygon[next_point][0])) {
-
-
-  //           m_log->message(2,"node is on edge 2: %15.10f %15.10f\n", x, y);
-
-  //        m_log->message(2,"points: %15.10f %15.10f %15.10f %15.10f %15.10f\n", x, y, temp_y, slope, intercept );
-  //        m_log->message(2,"points: %15.10f %15.10f %15.10f %15.10f \n", polygon[current_point][0], polygon[current_point][1], polygon[next_point][0], polygon[next_point][1]);
 
        return true;
       } // end if
@@ -1667,13 +1650,7 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
 
   } // end if
 
-  if(inside){
-     //   m_log->message(2,"node is presumably inside\n");
-     //     m_log->message(2,"%15.10f %15.10f\n", x, y);
-        for(int current_point2=0; current_point2<polygon_size; current_point2++) {
-    //      m_log->message(2,"%15.10f %15.10f\n", polygon[current_point2][0], polygon[current_point2][1] );
-        }
-  }
+
   return inside;
 }
 
