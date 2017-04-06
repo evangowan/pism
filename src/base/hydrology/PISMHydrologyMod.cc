@@ -724,13 +724,13 @@ void HydrologyMod::update_impl(double t, double dt) {
 
     //    m_log->message(2, "+ %5i %5i\n", i, j); 
         m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
-
+/*
       if(i  == 17 && j  == 30 && t > 2060.0 * 365.0 * 24.0 * 3600.0 ){
 
       m_log->message(2,"+ %5i %5i %5i %5i %15.10f %15.10f %15.10f %15.10f\n", i, j, x_counter-1, y_counter-1,calculate_water(reference_cell, compare_cell,false), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)), calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1)));
      double dummy = calculate_water(reference_cell, compare_cell,true);
      }
-
+*/
 
        } // end if
       } // end for
@@ -749,10 +749,11 @@ void HydrologyMod::update_impl(double t, double dt) {
          m_log->message(2,"%15.10f %15.10f\n", double(i)-0.5, double(j)-0.5 );
       }
 */
+/*
      if (m_excess_water_playground(i,j) > 1e-8) { // fudge
        m_excess_water_playground(i,j) = 1e-8;
      }
-
+*/
 
     sum_excess_water_playground += m_excess_water_playground(i,j);
  if(mask.icy(i,j) && t > 1800.0 * 365.0 * 24.0 * 3600.0){
