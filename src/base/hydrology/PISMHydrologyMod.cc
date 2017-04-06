@@ -725,16 +725,19 @@ void HydrologyMod::update_impl(double t, double dt) {
     //    m_log->message(2, "+ %5i %5i\n", i, j); 
         m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
 
-      if(i  == 15 && j  == 32 && t > 2400.0 ){
+      if(i  == 17 && j  == 30 && t > 2060.0 * 365.0 * 24.0 * 3600.0 ){
 
       m_log->message(2,"+ %5i %5i %5i %5i %15.10f %15.10f %15.10f %15.10f\n", i, j, x_counter-1, y_counter-1,calculate_water(reference_cell, compare_cell,false), m_excess_water(i + (x_counter-1), j + (y_counter-1)), quad_area(i + (x_counter-1), j + (y_counter-1)), calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1)));
      double dummy = calculate_water(reference_cell, compare_cell,true);
      }
 
- //m_log->message(2,"* after calculate_water : %5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i + (x_counter-1), j + (y_counter-1)),  m_excess_water_playground(i,j));
+
        } // end if
       } // end for
     } // end for
+
+
+
 
 /*
       if(m_excess_water_playground(i,j) > 0.0){
@@ -752,8 +755,8 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
     sum_excess_water_playground += m_excess_water_playground(i,j);
- if(mask.icy(i,j)){
-// m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i , j)*1e8,  m_excess_water_playground(i,j)*1e8);
+ if(mask.icy(i,j) && t > 1800.0 * 365.0 * 24.0 * 3600.0){
+ //m_log->message(2,"%5i %5i %15.10f %15.10f\n", i, j, m_excess_water(i , j)*1e8,  m_excess_water_playground(i,j)*1e8);
 }
 
 //   } // end if
@@ -773,7 +776,7 @@ void HydrologyMod::projection_transformation(double transformation[2][2][2],doub
 
  // from Heckbert 1989 (Fundamentals of texture mapping and image warping, page 20)
 
- double epsilon = 0.000001;
+ double epsilon = 0.0000001;
 
  // make it a unit square
 
@@ -876,7 +879,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   double water;
 
-   double epsilon = 0.000001;
+   double epsilon = 0.0000001;
 
 //  m_log->message(2, "* within_calculate_water ...\n");
 
@@ -1442,7 +1445,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
 
 
   // if the nodes are equal, then by definition, there is no crossover
-  double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
+  double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
 
   if((std::fabs(reference1 -> x - compare1 -> x) < epsilon && std::fabs(reference1 ->y - compare1 -> y) < epsilon) || 
      (std::fabs(reference1 -> x - compare2 -> x) < epsilon && std::fabs(reference1 ->y - compare2 -> y) < epsilon) || 
@@ -1615,7 +1618,7 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
 
   if(!inside && on_edge) { // find out if the point is on the edge of the polygon
 
-   double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
+   double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical, I hope 10^-6 is good enough
    double slope, intercept;
 
    for(current_point=0; current_point<polygon_size; current_point++) {
