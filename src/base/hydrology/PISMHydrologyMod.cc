@@ -54,6 +54,15 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
                        "1", "");
   m_fraction_channel.metadata().set_double("valid_min", 0.0);
 
+
+
+  m_number_tunnels.create(m_grid, "number_tunnels", WITHOUT_GHOSTS);
+  m_number_tunnels.set_attrs("model_state",
+                       "number of tunnels",
+                       "1", "");
+ // m_number_tunnels.metadata().set_double("valid_min", 0.0);
+
+
   m_till_permeability.create(m_grid, "till_permeability", WITHOUT_GHOSTS);
   m_till_permeability.set_attrs("model_state",
                        "hydraulic permeability of the till",
@@ -314,7 +323,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   double m_t = t;
   double m_dt = dt;
 
-  IceModelVec::AccessList list{&m_tillwat_flux, &m_pressure_gradient, &m_total_input,&m_theta,&m_gradient_magnitude};
+  IceModelVec::AccessList list{&m_tillwat_flux, &m_pressure_gradient, &m_total_input,&m_theta,&m_gradient_magnitude, &m_number_tunnels};
 
   get_input_rate(t, dt, m_total_input); // retrieve the calculated input due to basal melting, etc
 
@@ -397,7 +406,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 //  m_excess_water_playground.copy_from(m_excess_water);
   m_excess_water_playground.set(0.0);
   m_excess_water_removed.set(0.0);
-  double seconds_in_year = 365*24*3600;
+  double seconds_in_year = 365.0*24.0*3600.0;
    m_log->message(2,"* till_drainage before: \n");
   // next find the amount of water flow into each cell from adjacent cells with the updated ghosts
   double drainage, drainage_before;
@@ -620,8 +629,16 @@ void HydrologyMod::update_impl(double t, double dt) {
   m_log->message(2,
              "* finished calculating hydrology ...\n");
   
+//  m_log->message(2,
+ //            "* sums: ... %15.10f %15.10f\n",sum_excess_water,sum_excess_water_playground );
+
+
+ // calculate number of tunnels
+
+ tunnels(m_number_tunnels);
+
   m_log->message(2,
-             "* sums: ... %15.10f %15.10f\n",sum_excess_water,sum_excess_water_playground );
+             "* finished number of tunnels ... %15.10f\n", m_number_tunnels(31,43));
 
 } // end function HydrologyMod::update_impl
 
@@ -1301,6 +1318,7 @@ void HydrologyMod::define_model_state_impl(const PIO &output) const {
   m_theta.define(output);
   m_Pover_ghosts.define(output);
   m_pressure_gradient.define(output);
+  m_number_tunnels.define(output);
 }
 
 void HydrologyMod::write_model_state_impl(const PIO &output) const {
@@ -1313,6 +1331,7 @@ void HydrologyMod::write_model_state_impl(const PIO &output) const {
   m_theta.write(output);
   m_Pover_ghosts.write(output);
   m_pressure_gradient.write(output);
+  m_number_tunnels.write(output);
 }
 
 
@@ -1584,19 +1603,61 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
   m_log->message(2,"* entering tunnels ...\n");
 
   const double
-    radius = m_config->get_double("hydrology.tunnel_radius"),
-    roughness_coefficient = m_config->get_double("hydrology.roughness_coefficient"),
+    radius = m_config->get_double("hydrology.tunnel_radius"), // 0.2
+    rho_w = m_config->get_double("constants.fresh_water.density"), // 1000
+    roughness_coefficient = m_config->get_double("hydrology.roughness_coefficient"), // 0.12
+    g = m_config->get_double("constants.standard_gravity"),
     pi = 3.14159265358979323846;
 
   double cross_section_tunnel = pi * pow(radius,2.0);
   double Rh = radius/2.0;
 
+  double dx = m_grid->dx();
+  double dy = m_grid->dy();
 
+  double average_length = (dx + dy) / 2.0;
 
-  IceModelVec::AccessList list{&m_fraction_channel,&m_excess_water,&result};
-  //ParallelSection loop(m_grid->com);
+  double max_tunnels = radius * average_length; // set a maximum amount of "tunnels", arbitrarily set to be half the grid cell area. If a lake formed, it probably
+                                                // could be the whole area, but more likely to be less
+
+ // IceModelVec::AccessList list{&m_fraction_channel,&m_excess_water,&result};
+  IceModelVec::AccessList list;
+  list.add(m_fraction_channel);
+  list.add(m_gradient_magnitude);
+  list.add(m_excess_water);
+  list.add(result);
+  const IceModelVec2CellType &mask = *m_grid->variables().get_2d_cell_type("mask");
+  list.add(mask);
+
+  m_fraction_channel.set(0.0);
 
   result.set(0.0);
+
+  for (Points p(*m_grid); p; p.next()) {										
+    const int i = p.i(), j = p.j();
+
+   if(mask.icy(i,j)) {
+
+    double Q_w = cross_section_tunnel / (rho_w * g * roughness_coefficient) * pow(Rh, 2.0/3.0) * m_gradient_magnitude(i,j);
+
+ //   if(Q_w > 
+
+    result(i,j) = m_excess_water(i,j) / Q_w;
+
+    if(result(i,j) > max_tunnels) { // if the gradient magnitude is zero, then setting it to max tunnels (the basal shear stress will be near zero anyways)
+     result(i,j) = max_tunnels;
+    }
+
+      m_log->message(2,"%5i %5i %15.10f  %15.10f\n", i,j, result(i,j), m_gradient_magnitude(i,j));
+
+    // assuming that the tunnel goes straight in the direction of the grid, and that the number of tunnels should accommodate all the water flow
+    m_fraction_channel(i,j) = result(i,j) * radius * 2.0 / average_length;
+
+   }
+
+  }
+
+
 
   m_log->message(2,"* finished tunnels ...\n");
 

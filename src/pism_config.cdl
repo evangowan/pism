@@ -801,7 +801,7 @@ netcdf pism_config {
     pism_config:hydrology.tillwat_decay_rate_type = "scalar";
     pism_config:hydrology.tillwat_decay_rate_units = "meter / second";
 
-    pism_config:hydrology.tillwat_max = 2.0;
+    pism_config:hydrology.tillwat_max = 0.2;
     pism_config:hydrology.tillwat_max_doc = "maximum effective thickness of the water stored in till";
     pism_config:hydrology.tillwat_max_option = "hydrology_tillwat_max";
     pism_config:hydrology.tillwat_max_type = "scalar";

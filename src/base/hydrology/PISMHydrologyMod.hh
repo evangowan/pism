@@ -82,7 +82,7 @@ public:
 
 
 protected:
-  IceModelVec2S m_fraction_till, m_fraction_channel, m_Pover_ghosts, m_gradient_magnitude, m_tillwat_flux, m_excess_water, m_till_permeability;
+  IceModelVec2S m_fraction_till, m_fraction_channel, m_Pover_ghosts, m_gradient_magnitude, m_tillwat_flux, m_excess_water, m_till_permeability, m_number_tunnels;
 
   IceModelVec2V m_pressure_gradient;
   virtual void get_input_rate(double hydro_t, double hydro_dt, IceModelVec2S &result);
