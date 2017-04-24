@@ -82,7 +82,7 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
                        "Pa m-1", "");
 
 
-  m_gradient_magnitude.create(m_grid, "gradient_magnitude", WITHOUT_GHOSTS);
+  m_gradient_magnitude.create(m_grid, "gradient_magnitude", WITH_GHOSTS,1);
   m_gradient_magnitude.set_attrs("model_state",
                        "pressure gradient magnitude at the base",
                        "Pa m-1", "");
@@ -95,7 +95,7 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
 //  m_tillwat_flux.metadata().set_double("valid_min", 0.0);
 //  m_grid->variables().add(m_tillwat_flux);
 
-  m_excess_water.create(m_grid, "excess_water", WITH_GHOSTS); 
+  m_excess_water.create(m_grid, "excess_water", WITH_GHOSTS, 1); 
   m_excess_water.set_attrs("model_state",
                        "extra water flux from water not in till",
                        "m s-1", "");
@@ -103,7 +103,7 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
 
 
 
-  m_excess_water_playground.create(m_grid, "excess_water_playground", WITHOUT_GHOSTS); 
+  m_excess_water_playground.create(m_grid, "excess_water_playground", WITH_GHOSTS,1); 
   m_excess_water_playground.set_attrs("internal",
                        "extra water flux from water not in till",
                        "m s-1", "");
@@ -330,9 +330,13 @@ void HydrologyMod::update_impl(double t, double dt) {
 
   pressure_gradient(m_pressure_gradient,m_gradient_magnitude,m_theta); // find the basal pressure gradient
 
+  m_gradient_magnitude.update_ghosts();
+  m_theta.update_ghosts();
+  m_pressure_gradient.update_ghosts();
   // calculate till water flux with the given gradient magnitude
 
   till_drainage(m_tillwat_flux, dt);
+  m_tillwat_flux.update_ghosts();
 
   // with the given input rate and till drainage, fill up the till with water
 
@@ -435,15 +439,15 @@ void HydrologyMod::update_impl(double t, double dt) {
   quad_area.set(1.0); // should be a unit cell outside of the icy area
 
   // calculate the translation of the grid cell's corners, to determine water content to surrounding cells
+
   for (Points p(*m_grid); p; p.next()) {
    const int i = p.i(), j = p.j();
-   if(mask.icy(i,j) ) {
 
+   if(mask.icy(i,j) ) {
+//   m_log->message(2,"%5i %5i\n",i, j );
     // first find the translation of the center of all the cells
     for(x_counter=0; x_counter<3; x_counter++ ){
       for(y_counter=0; y_counter<3; y_counter++ ){ 
-
-
 
        if(m_gradient_magnitude(i+x_counter-1,j+y_counter-1) > 0.0 && mask.icy(i+x_counter-1,j+y_counter-1)) {
         translate_center[x_counter][y_counter][0] = cos(m_theta(i+x_counter-1,j+y_counter-1)); // translate x
@@ -455,10 +459,11 @@ void HydrologyMod::update_impl(double t, double dt) {
 
       }  // end for
     } // end for
-
+ 
+  // m_log->message(2,"outside of translate center initialization" );
     // calculate the quadrilateral transformation
 
-    // bottom left
+    // bottom left 
 
     transformation[0][0][0] = translate_center[0][0][0];
     transformation[0][0][1] = translate_center[0][0][1];
@@ -580,6 +585,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   bottom_right.update_ghosts();
   quad_area.update_ghosts();
   
+   m_log->message(2,"* after ghost update: \n");
   double reference_cell[4][2], compare_cell[4][2];
 
   reference_cell[0][0] = -0.5; // bottom left
@@ -594,6 +600,7 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
   m_excess_water_playground.set(0.0);
+   m_log->message(2,"* before playground: \n");
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
     sum_excess_water += m_excess_water(i,j);
@@ -604,8 +611,7 @@ void HydrologyMod::update_impl(double t, double dt) {
        int x_index = i+x_counter-1;
        int y_index = j+y_counter-1;
 
-  m_log->message(2,
-             "%5i %5i\n",x_index, y_index );
+
 
        if(mask.icy(x_index,y_index)) {
         compare_cell[0][0] = double(x_counter-1) + bottom_left(x_index,y_index).u; // bottom left
@@ -630,8 +636,10 @@ void HydrologyMod::update_impl(double t, double dt) {
     sum_excess_water_playground += m_excess_water_playground(i,j);
 
   } // end for
-
+   m_log->message(2,"* after playground: \n");
   m_excess_water.copy_from(m_excess_water_playground);
+   m_log->message(2,"* after copy: \n");
+  m_excess_water.update_ghosts();
   m_log->message(2,
              "* finished calculating hydrology ...\n");
   
@@ -642,9 +650,10 @@ void HydrologyMod::update_impl(double t, double dt) {
  // calculate number of tunnels
 
  tunnels(m_number_tunnels);
-
   m_log->message(2,
-             "* finished number of tunnels ... %15.10f\n", m_number_tunnels(31,43));
+             "* finished hydrologymod ...\n");
+//  m_log->message(2,
+ //            "* finished number of tunnels ... %15.10f\n", m_number_tunnels(31,43));
 
 } // end function HydrologyMod::update_impl
 
