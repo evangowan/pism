@@ -617,7 +617,10 @@ void HydrologyMod::update_impl(double t, double dt) {
         compare_cell[3][0] = double(x_counter-1) + bottom_right(x_index,y_index).u; // bottom right
         compare_cell[3][1] = double(y_counter-1) + bottom_right(x_index,y_index).v;
 
+
+
         m_excess_water_playground(i,j) += calculate_water(reference_cell, compare_cell,false) * m_excess_water(i + (x_counter-1), j + (y_counter-1)) / quad_area(i + (x_counter-1), j + (y_counter-1));
+
 
        } // end if
       } // end for
@@ -661,7 +664,7 @@ void HydrologyMod::projection_transformation(double transformation[2][2][2],doub
 
 
 
- double epsilon = 0.0000001;
+ double epsilon = 0.000001;
 
  // make it a unit square
 
@@ -770,7 +773,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   double water;
 
-  double epsilon = 0.0000001;
+  double epsilon = 0.000001;
 
   polygon_linked_list reference;
 
@@ -943,6 +946,10 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   node * crossover_node;
 
+  if(printing){
+   reference.print_polygon(0);
+   reference.print_polygon(1); 
+  }
 
 // segfault happens here somewhere
   while (not_finished) {
@@ -958,8 +965,21 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      compare_point = 1;
      while(not_finished2) {
  
+     if(printing){
+          m_log->message(2, "before trying: %5i %5i \n", compare_point, not_finished2);
+     }
       not_finished2 = reference.findNode(compare_node,compare_point,1);
-       not_finished2 = reference.findNode(compare_node2,compare_point+1,1);
+
+     if(printing){
+          m_log->message(2, "try1: %5i %5i \n", compare_point, not_finished2);
+     }
+
+      not_finished2 = reference.findNode(compare_node2,compare_point+1,1);
+
+
+     if(printing){
+          m_log->message(2, "try2: %5i %5i \n", compare_point+1, not_finished2);
+     }
 
        if(not_finished2) {
 
@@ -971,6 +991,10 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
          if(printing){
           m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f  %15.10f %15.10f %5i \n", reference_node -> x, reference_node -> y, compare_node -> x, compare_node -> y, x, y, is_crossover);
           m_log->message(2, "* %15.10f %15.10f %15.10f %15.10f \n", reference_node2 -> x, reference_node2 -> y, compare_node2 -> x, compare_node2 -> y);
+
+          reference.print_polygon(0);
+          reference.print_polygon(1);
+          m_log->message(2, "OK then\n");
          }
 
          if(is_crossover) {
@@ -978,19 +1002,47 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
            shared_node_number++;
            // first check that they aren't shared nodes
            if(std::fabs(x - reference_node -> x) < epsilon && std::fabs(y - reference_node -> y) < epsilon) { // the crossover matches the reference node
+            if(printing){
+              m_log->message(2, "adding reference_node1 to compare polygon\n");
+             }
              reference_node -> inside = true;
              reference_node -> shared_node_number = shared_node_number;
              reference.insertNode(reference_node,compare_point+1,1);      
              compare_node_count++;
            } else if(std::fabs(x - reference_node2 -> x) < epsilon && std::fabs(y - reference_node2 -> y) < epsilon) { // the crossover matches the reference node2
+            if(printing){
+              m_log->message(2, "adding reference_node2 to compare polygon\n");
+             }
              reference_node2 -> inside = true;
              reference_node2 -> shared_node_number = shared_node_number;
              reference.insertNode(reference_node2,compare_point+1,1);      
              compare_node_count++;
-           } else { // shouldn't need to check the compare nodes, because that was done during the creation of the compare polygon
+           } else if(std::fabs(x - compare_node -> x) < epsilon && std::fabs(y - compare_node -> y) < epsilon) { // the crossover matches the compare node
+            if(printing){
+              m_log->message(2, "adding compare_node1 to reference polygon\n");
+             }
+             compare_node -> inside = true;
+             compare_node -> shared_node_number = shared_node_number;  
+             reference.insertNode(compare_node,reference_point+1,0);   
+             reference_node_count++; 
+           } else if(std::fabs(x - compare_node2 -> x) < epsilon && std::fabs(y - compare_node2 -> y) < epsilon) { // the crossover matches the compare node2
+            if(printing){
+              m_log->message(2, "adding compare_node2 to reference polygon\n");
+             }
+             compare_node2 -> inside = true;
+             compare_node2 -> shared_node_number = shared_node_number;
+             reference.insertNode(compare_node2,reference_point+1,0);   
+             reference_node_count++;
+           } else { 
            // add the node to the polygons and restart the search
 
-           
+            if(printing){
+              m_log->message(2, "adding crossover to reference and compare polygons\n");
+              m_log->message(2, "reference1: %15.10f %15.10f\n", std::fabs(x - reference_node -> x), std::fabs(y - reference_node -> y));
+              m_log->message(2, "reference2: %15.10f %15.10f\n", std::fabs(x - reference_node2 -> x), std::fabs(y - reference_node2 -> y));
+              m_log->message(2, "compare1: %15.10f %15.10f\n", std::fabs(x - compare_node -> x), std::fabs(y - compare_node -> y));
+              m_log->message(2, "compare2: %15.10f %15.10f\n", std::fabs(x - compare_node2 -> x), std::fabs(y - compare_node2 -> y));
+             }
             reference.create_node(crossover_node);
             crossover_node -> x = x;
             crossover_node -> y = y;
@@ -1010,6 +1062,11 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
            not_finished2 = false;
 
          } else {
+
+     if(printing){
+          m_log->message(2, "no crossover");
+     }
+
           compare_point++;
 
          } // end if
@@ -1025,8 +1082,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
 
 
-  reference.print_polygon(0);
-  reference.print_polygon(1); 
+  //reference.print_polygon(0);
+ // reference.print_polygon(1); 
 
   node * final_node;
   node * append_node;
@@ -1151,9 +1208,9 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
  // for debugging
  if (printing){
 
-  reference.print_polygon(0);
-  reference.print_polygon(1); 
-  reference.print_polygon(2);
+//  reference.print_polygon(0);
+//  reference.print_polygon(1); 
+//  reference.print_polygon(2);
 
  }
 
@@ -1173,7 +1230,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
 
 
   // if the nodes are equal, then by definition, there is no crossover
-  double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical
+  double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical
 
   // good reference for the problems with floating point math: https://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
   if((std::fabs(reference1 -> x - compare1 -> x) < epsilon && std::fabs(reference1 ->y - compare1 -> y) < epsilon) || 
@@ -1285,7 +1342,7 @@ bool HydrologyMod::point_in_polygon(double polygon[][2], int polygon_size, doubl
 
   if(!inside && on_edge) { // find out if the point is on the edge of the polygon
 
-   double epsilon = 0.0000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical
+   double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical
    double slope, intercept;
 
    for(current_point=0; current_point<polygon_size; current_point++) {
@@ -1875,7 +1932,7 @@ Function to find a given node for a given polygon (set by polygon_number)
    // std::cout << "reference: " << polygon_number << " "  << listLength[polygon_number] << "\n";
    std::cout << "> -Z-1" << "\n";
   } else if (polygon_number == 1) {
-   // std::cout << "compare: " << polygon_number << " "  << listLength[polygon_number] << "\n";
+    std::cout << "compare: " << polygon_number << " "  << listLength[polygon_number] << "\n";
    std::cout << "> -Z0" << "\n";
   } else {
    // std::cout << "overlap: " << polygon_number << " "  << listLength[polygon_number] << "\n";
@@ -1894,9 +1951,9 @@ Function to find a given node for a given polygon (set by polygon_number)
    for(int count = 1; count <= listLength[polygon_number]; count++){
 
     if(q -> inside) {
-     std::cout << q -> x << " " << q ->y << " true " << "\n";
+     std::cout << q -> x << " " << q ->y << " true " << q -> next[polygon_number] << "\n";
     } else {
-     std::cout << q -> x << " " << q ->y << " false "  << "\n";
+     std::cout << q -> x << " " << q ->y << " false "  << q -> next[polygon_number] <<  "\n";
     }
     q = q -> next[polygon_number];
 
