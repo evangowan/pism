@@ -80,6 +80,8 @@ public:
 
   virtual void subglacial_water_pressure(IceModelVec2S &result) const;
 
+  virtual void fraction_channel(IceModelVec2S &result) const;
+  virtual void fraction_till(IceModelVec2S &result) const;
 
 protected:
   IceModelVec2S m_fraction_till, m_fraction_channel, m_Pover_ghosts, m_gradient_magnitude, m_tillwat_flux, m_excess_water, m_till_permeability, m_number_tunnels;

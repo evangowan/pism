@@ -22,7 +22,7 @@
 #include "iceModel.hh"
 #include "base/basalstrength/PISMConstantYieldStress.hh"
 #include "base/basalstrength/PISMMohrCoulombYieldStress.hh"
-//#include "base/basalstrength/PISMMohrCoulombYieldStressMod.hh"
+#include "base/basalstrength/PISMMohrCoulombYieldStressMod.hh"
 #include "base/basalstrength/basal_resistance.hh"
 #include "base/calving/CalvingAtThickness.hh"
 #include "base/calving/EigenCalving.hh"
@@ -615,6 +615,8 @@ void IceModel::allocate_basal_yield_stress() {
 
   std::string model = m_config->get_string("stress_balance.model");
 
+  std::string hydrology_model = m_config->get_string("hydrology.model");
+
   // only these two use the yield stress (so far):
   if (model == "ssa" || model == "ssa+sia") {
     std::string yield_stress_model = m_config->get_string("basal_yield_stress.model");
@@ -623,8 +625,8 @@ void IceModel::allocate_basal_yield_stress() {
       m_basal_yield_stress_model = new ConstantYieldStress(m_grid);
     } else if (yield_stress_model == "mohr_coulomb") {
       m_basal_yield_stress_model = new MohrCoulombYieldStress(m_grid, m_subglacial_hydrology);
-//    } else if (yield_stress_model == "mohr_coulomb_mod") {
-//      m_basal_yield_stress_model = new MohrCoulombYieldStressMod(m_grid, m_subglacial_hydrology);
+    } else if (yield_stress_model == "mohr_coulomb_mod" && hydrology_model == "hydrologymod") {
+      m_basal_yield_stress_model = new MohrCoulombYieldStressMod(m_grid, m_subglacial_hydrology);
     } else {
       throw RuntimeError::formatted(PISM_ERROR_LOCATION, "yield stress model '%s' is not supported.",
                                     yield_stress_model.c_str());

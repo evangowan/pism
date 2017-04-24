@@ -604,6 +604,9 @@ void HydrologyMod::update_impl(double t, double dt) {
        int x_index = i+x_counter-1;
        int y_index = j+y_counter-1;
 
+  m_log->message(2,
+             "%5i %5i\n",x_index, y_index );
+
        if(mask.icy(x_index,y_index)) {
         compare_cell[0][0] = double(x_counter-1) + bottom_left(x_index,y_index).u; // bottom left
         compare_cell[0][1] = double(y_counter-1) + bottom_left(x_index,y_index).v; 
@@ -773,8 +776,15 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   int reference_node_count = 0;
   int compare_node_count = 0;
-
-
+/*
+  m_log->message(2,
+             "Entering calculate_water\n");
+  m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", reference_cell[0][0], reference_cell[0][1], compare_cell[0][0], compare_cell[0][1]);
+  m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", reference_cell[1][0], reference_cell[1][1], compare_cell[1][0], compare_cell[1][1]);
+  m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", reference_cell[2][0], reference_cell[2][1], compare_cell[2][0], compare_cell[2][1]);
+  m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", reference_cell[3][0], reference_cell[3][1], compare_cell[3][0], compare_cell[3][1]);
+  m_log->message(2,"%15.10f %15.10f %15.10f %15.10f\n", reference_cell[0][0], reference_cell[0][1], compare_cell[0][0], compare_cell[0][1]);
+*/
   node * reference_node2;
   node * compare_node2;
   node * reference_node;
@@ -919,6 +929,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   node * compare_node;
 
+
   // find and add the crossover points
  
   bool not_finished = true;
@@ -932,6 +943,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   node * crossover_node;
 
+
+// segfault happens here somewhere
   while (not_finished) {
 
     not_finished = reference.findNode(reference_node,reference_point,0);
@@ -1010,6 +1023,10 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 
   } // end while
 
+
+
+  reference.print_polygon(0);
+  reference.print_polygon(1); 
 
   node * final_node;
   node * append_node;
@@ -1312,26 +1329,28 @@ void HydrologyMod::define_model_state_impl(const PIO &output) const {
   Hydrology::define_model_state_impl(output);
   m_tillwat_flux.define(output);
   m_excess_water.define(output);
-  m_fraction_till.define(output);
+//  m_fraction_till.define(output);
   m_total_input.define(output);
   m_gradient_magnitude.define(output);
   m_theta.define(output);
   m_Pover_ghosts.define(output);
   m_pressure_gradient.define(output);
   m_number_tunnels.define(output);
+  m_fraction_channel.define(output);
 }
 
 void HydrologyMod::write_model_state_impl(const PIO &output) const {
   Hydrology::write_model_state_impl(output);
   m_tillwat_flux.write(output);
   m_excess_water.write(output);
-  m_fraction_till.write(output);
+//  m_fraction_till.write(output);
   m_total_input.write(output);
   m_gradient_magnitude.write(output);
   m_theta.write(output);
   m_Pover_ghosts.write(output);
   m_pressure_gradient.write(output);
   m_number_tunnels.write(output);
+  m_fraction_channel.write(output);
 }
 
 
@@ -1354,7 +1373,8 @@ std::map<std::string, Diagnostic::Ptr> HydrologyMod::diagnostics_impl() const {
 //! Copies the W variable, the modeled transportable water layer thickness.
 void HydrologyMod::subglacial_water_thickness(IceModelVec2S &result) const {
   m_log->message(2,"* entering subglacial_water_thickness ...\n");
-  result.set(0.0);
+//  result.set(0.0);
+    result.copy_from(m_Wtil);
 }
 
 
@@ -1648,7 +1668,7 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
      result(i,j) = max_tunnels;
     }
 
-      m_log->message(2,"%5i %5i %15.10f  %15.10f\n", i,j, result(i,j), m_gradient_magnitude(i,j));
+  //    m_log->message(2,"%5i %5i %15.10f  %15.10f\n", i,j, result(i,j), m_gradient_magnitude(i,j));
 
     // assuming that the tunnel goes straight in the direction of the grid, and that the number of tunnels should accommodate all the water flow
     m_fraction_channel(i,j) = result(i,j) * radius * 2.0 / average_length;
@@ -1662,6 +1682,19 @@ void HydrologyMod::tunnels(IceModelVec2S &result) {
   m_log->message(2,"* finished tunnels ...\n");
 
 }
+
+
+//! Copies the fraction of ice that is not in contact with the ground due to the presence of tunnels
+void HydrologyMod::fraction_channel(IceModelVec2S &result) const {
+  result.copy_from(m_fraction_channel);
+}
+
+
+//! Copies the fraction of ice that is not in contact with the ground due to the presence of tunnels
+void HydrologyMod::fraction_till(IceModelVec2S &result) const {
+  result.copy_from(m_fraction_till);
+}
+
 
 /*
   linked list class

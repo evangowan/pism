@@ -145,6 +145,7 @@ add_library (pism
   base/iceModel_diagnostics.cc
   base/basalstrength/PISMYieldStress.cc
   base/basalstrength/PISMMohrCoulombYieldStress.cc
+  base/basalstrength/PISMMohrCoulombYieldStressMod.cc
   base/basalstrength/PISMConstantYieldStress.cc
   base/hydrology/PISMHydrology.cc
   base/hydrology/PISMNullTransportHydrology.cc
