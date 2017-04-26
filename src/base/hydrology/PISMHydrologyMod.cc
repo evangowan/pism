@@ -31,6 +31,7 @@
 #include "base/util/IceModelVec2CellType.hh"
 #include <math.h>
 #include <stdlib.h>
+#include <petscsys.h>
 
 #include <iostream>
 #include <algorithm>    // std::min, max
@@ -600,11 +601,14 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
   m_excess_water_playground.set(0.0);
-   m_log->message(2,"* before playground: \n");
+  m_log->message(2,"* before playground: \n");
   for (Points p(*m_grid); p; p.next()) {
     const int i = p.i(), j = p.j();
     sum_excess_water += m_excess_water(i,j);
 
+
+//  m_log->message(2,
+//             "*  %5i %5i\n",i,j );
     for(x_counter=0; x_counter<3; x_counter++ ){
       for(y_counter=0; y_counter<3; y_counter++ ){ 
 
@@ -630,6 +634,9 @@ void HydrologyMod::update_impl(double t, double dt) {
 
        } // end if
       } // end for
+
+ // m_log->message(2,
+ //            "* sums: ... %15.10f %15.10f\n",m_excess_water(i,j),m_excess_water_playground(i,j) );
     } // end for
 
 
@@ -639,6 +646,15 @@ void HydrologyMod::update_impl(double t, double dt) {
    m_log->message(2,"* after playground: \n");
   m_excess_water.copy_from(m_excess_water_playground);
    m_log->message(2,"* after copy: \n");
+
+
+
+
+  // update ghosts before going into tunnels, probably not necessary, but for now it is there
+
+  //sometimes the program hangs here, no idea why. Removing this line allows this function to exit, but it still freezes later on
+
+
   m_excess_water.update_ghosts();
   m_log->message(2,
              "* finished calculating hydrology ...\n");

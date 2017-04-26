@@ -144,6 +144,9 @@ void MohrCoulombYieldStressMod::write_model_state_impl(const PIO &output) const 
 // with basal hydrology and changes in the distribution of till
 void MohrCoulombYieldStressMod::update_impl() {
 
+  m_log->message(2,
+             "* entering Mohr Coulomb Yield Stress Mod ...\n");
+
   bool slippery_grounding_lines = m_config->get_boolean("basal_yield_stress.slippery_grounding_lines"),
        add_transportable_water  = m_config->get_boolean("basal_yield_stress.add_transportable_water");
 
@@ -212,6 +215,9 @@ void MohrCoulombYieldStressMod::update_impl() {
   }
 
   m_basal_yield_stress.update_ghosts();
+
+  m_log->message(2,
+             "* finished Mohr Coulomb Yield Stress Mod ...\n");
 }
 
 } // end namespace pism
