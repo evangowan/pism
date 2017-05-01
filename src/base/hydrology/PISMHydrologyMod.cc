@@ -1191,7 +1191,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
      reference_node = overlap_node -> next[0];
      compare_node = overlap_node -> next[1];
 
-     if(reference_node != NULL && reference_node ->next[0] !=NULL && reference_node -> inside) {
+     if(reference_node != NULL && reference_node ->next[0] !=NULL && reference_node -> inside && reference_node->next[2] == NULL) {
 
        if (reference_node != final_node) {
          overlap_points++;
@@ -1202,7 +1202,7 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
        end_found = true;
        }
 
-     } else if(compare_node != NULL && compare_node ->next[1] !=NULL && compare_node -> inside) {
+     } else if(compare_node != NULL && compare_node ->next[1] !=NULL && compare_node -> inside && compare_node->next[2] == NULL) {
 
       if (compare_node != final_node ) {
        overlap_points++;
