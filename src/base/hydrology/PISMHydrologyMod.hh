@@ -111,7 +111,7 @@ protected:
   virtual MaxTimestep max_timestep_impl(double t) const;
 
 private:
-  IceModelVec2S m_theta, m_excess_water_playground,  m_excess_water_removed, quad_area; 
+  IceModelVec2S m_theta, m_excess_water_playground,  m_excess_water_removed, quad_area, smooth_pressure; 
   IceModelVec2V bottom_left, top_left, bottom_right, top_right;
 
 };

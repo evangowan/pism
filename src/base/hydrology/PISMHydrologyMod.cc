@@ -148,6 +148,12 @@ HydrologyMod::HydrologyMod(IceGrid::ConstPtr g)
                        "1", "");
 
 
+  smooth_pressure.create(m_grid, "smooth_pressure", WITH_GHOSTS,1); 
+  smooth_pressure.set_attrs("internal",
+                       "spatially smoothed pressure",
+                       "Pa", "");
+
+
 //  m_grid->variables().add(m_excess_water);
 
   m_theta.create(m_grid, "water_flow_direction", WITH_GHOSTS,1);
@@ -450,9 +456,11 @@ void HydrologyMod::update_impl(double t, double dt) {
     for(x_counter=0; x_counter<3; x_counter++ ){
       for(y_counter=0; y_counter<3; y_counter++ ){ 
 
-       if(m_gradient_magnitude(i+x_counter-1,j+y_counter-1) > 0.0 && mask.icy(i+x_counter-1,j+y_counter-1)) {
+       if(m_gradient_magnitude(i+x_counter-1,j+y_counter-1) > 0.0 ) {
         translate_center[x_counter][y_counter][0] = cos(m_theta(i+x_counter-1,j+y_counter-1)); // translate x
         translate_center[x_counter][y_counter][1] = sin(m_theta(i+x_counter-1,j+y_counter-1)); // translate y
+
+
        } else{
         translate_center[x_counter][y_counter][0] = 0; // translate x
         translate_center[x_counter][y_counter][1] = 0; // translate y  
@@ -478,6 +486,9 @@ void HydrologyMod::update_impl(double t, double dt) {
 
 
     projection_transformation(transformation,quadrilateral[0][0], quadrilateral[0][1]);
+
+
+
     quadrilateral[0][0] = quadrilateral[0][0]-1.0;
     quadrilateral[0][1] = quadrilateral[0][1]-1.0;
     bottom_left(i,j).u = quadrilateral[0][0];
@@ -537,13 +548,84 @@ void HydrologyMod::update_impl(double t, double dt) {
     bottom_right(i,j).u = quadrilateral[3][0];
     bottom_right(i,j).v = quadrilateral[3][1];
 
+    // find the area of the quadralateral
+
+    quad_area(i,j) = find_quad_area(quadrilateral);
+
+    bool check_regular = false;
+    bool check_regular2 = false;
+
+    node * node1 = new node;
+    node1 -> x = quadrilateral[0][0];
+    node1 -> y = quadrilateral[0][1];
+    node1 -> inside = false;
+
+    node * node2 = new node;
+    node2 -> x = quadrilateral[1][0];
+    node2 -> y = quadrilateral[1][1];
+    node2 -> inside = false;
+
+    node * node3 = new node;
+    node3 -> x = quadrilateral[2][0];
+    node3 -> y = quadrilateral[2][1];
+    node3 -> inside = false;
+
+    node * node4 = new node;
+    node4 -> x = quadrilateral[3][0];
+    node4 -> y = quadrilateral[3][1];
+    node4 -> inside = false;
+
+    bool is_crossover;
+
+    double temp_x, temp_y;
+
+    is_crossover = find_crossover(node1, node2, node3, node4, temp_x, temp_y);
+
+
+    if(is_crossover){
+     check_regular = true;
+    }
+
+    is_crossover = find_crossover(node1, node4, node2, node3, temp_x, temp_y);
+
+    if(is_crossover){
+     check_regular2 = true;
+    }
+
+    if(check_regular || check_regular2) {
+
+     m_log->message(2,"> %5i %5i %5i %5i \n",i, j, check_regular, check_regular2 );
+     m_log->message(2,"%15.10f %15.10f\n",quadrilateral[0][0], quadrilateral[0][1] );
+     m_log->message(2,"%15.10f %15.10f\n",quadrilateral[1][0], quadrilateral[1][1] );
+     m_log->message(2,"%15.10f %15.10f\n",quadrilateral[2][0], quadrilateral[2][1] );
+     m_log->message(2,"%15.10f %15.10f\n",quadrilateral[3][0], quadrilateral[3][1] );
+
+    bottom_right(i,j).u = 0.5;
+    bottom_right(i,j).v = -0.5;
+
+    // bottom left
+
+    bottom_left(i,j).u = -0.5;
+    bottom_left(i,j).v = -0.5;
+
+    // top right
+
+    top_right(i,j).u = 0.5;
+    top_right(i,j).v = 0.5;
+
+    // top left
+
+    top_left(i,j).u = -0.5;
+    top_left(i,j).v = 0.5;
+
+    quad_area(i,j) = 1.0;
+    }
+
 
 
     // TODO a check to make sure the translated quadralateral is regular? Probably shouldn't happen if the gradient is calculated correctly.
 
-    // find the area of the quadralateral
 
-    quad_area(i,j) = find_quad_area(quadrilateral);
 
    } else {
 
@@ -750,6 +832,65 @@ void HydrologyMod::projection_transformation(double transformation[2][2][2],doub
 
  }
 
+/*
+    if(std::abs(x) > 5.0) {
+        m_log->message(2,">>\n" );
+        m_log->message(2,"%15.10f %15.10f\n",transformation[0][0][0], transformation[0][0][1] );
+        m_log->message(2,"%15.10f %15.10f\n",transformation[1][0][0], transformation[1][0][1] );
+        m_log->message(2,"%15.10f %15.10f\n",transformation[1][1][0], transformation[1][1][1] );
+        m_log->message(2,"%15.10f %15.10f\n",transformation[0][1][0], transformation[0][1][1] );
+    }
+*/
+
+
+// check if it is a regular polygon, if it isn't return no shift.
+
+ //       m_log->message(2,"check for crossovers\n" );
+ bool check_regular = false;
+
+ node * node1 = new node;
+ node1 -> x = transformation[0][0][0];
+ node1 -> y = transformation[0][0][1];
+ node1 -> inside = false;
+
+ node * node2 = new node;
+ node2 -> x = transformation[1][0][0];
+ node2 -> y = transformation[1][0][1];
+ node2 -> inside = false;
+
+ node * node3 = new node;
+ node3 -> x = transformation[1][1][0];
+ node3 -> y = transformation[1][1][1];
+
+ node3 -> inside = false;
+ node * node4 = new node;
+ node4 -> x = transformation[0][1][0];
+ node4 -> y = transformation[0][1][1];
+ node4 -> inside = false;
+
+ bool is_crossover;
+
+ double temp_x, temp_y;
+
+ is_crossover = find_crossover(node1, node2, node3, node4, temp_x, temp_y);
+
+
+ if(is_crossover){
+   check_regular = true;
+ }
+
+ is_crossover = find_crossover(node1, node4, node2, node3, temp_x, temp_y);
+
+ if(is_crossover){
+   check_regular = true;
+ }
+
+
+ if(check_regular) {
+  x = 0.5;
+  y = 0.5;
+ }
+
 }
 
 
@@ -767,8 +908,23 @@ double HydrologyMod::find_quad_area(double quadrilateral[4][2]) {
   double q_x = quadrilateral[2][0] - quadrilateral[0][0];
   double q_y = quadrilateral[2][1] - quadrilateral[0][1]; 
 
+/*
+  if(std::fabs(p_x*q_y - p_y*q_x) * 0.5 > 5.0) {
+  
 
-  return fabs(p_x*q_y - p_y*q_x) * 0.5;
+  m_log->message(2,
+             ">\n");
+  m_log->message(2,"%15.10f %15.10f\n", quadrilateral[0][0], quadrilateral[0][1]);
+  m_log->message(2,"%15.10f %15.10f\n", quadrilateral[1][0], quadrilateral[1][1]);
+  m_log->message(2,"%15.10f %15.10f\n", quadrilateral[2][0], quadrilateral[2][1]);
+  m_log->message(2,"%15.10f %15.10f\n", quadrilateral[3][0], quadrilateral[3][1]);
+
+}
+*/
+
+  return std::fabs(p_x*q_y - p_y*q_x) * 0.5;
+
+
 
 }
 
@@ -1253,7 +1409,8 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
 */
 bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *compare1, node *compare2, double& x, double& y) {
 
-
+//      m_log->message(2,"Enter find_crossover \n");
+ //     m_log->message(2,"%15.10f %15.10f \n", reference1 -> x, reference1 -> y);
   // if the nodes are equal, then by definition, there is no crossover
   double epsilon = 0.000001; // If the difference between the x values are sufficiently small, I consider the line to be essentially vertical
 
@@ -1270,6 +1427,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
   double slope_reference, slope_compare, intercept_reference, intercept_compare;
 
   // first check if the slope of the reference points are infinite
+//      m_log->message(2,"first check if the slope of the reference points are infinite \n");
   if (fabs(reference1 -> x - reference2 -> x) < epsilon) {
    // also check the reference
    if (fabs(compare1 -> x - compare2 -> x) < epsilon) { // lines are likely parallel
@@ -1311,7 +1469,7 @@ bool HydrologyMod::find_crossover(node *reference1, node *reference2, node *comp
   }
 
   // check if the crossover point is between the two lines, and not lying directly on one of the other nodes
-
+ //     m_log->message(2,"check if the crossover point is between the two lines, and not lying directly on one of the other nodes \n");
   if(x <= std::max(compare1 -> x, compare2 -> x)+epsilon &&  x >= std::min(compare1 -> x, compare2 -> x)-epsilon && 
       y <= std::max(compare1 -> y, compare2 -> y)+epsilon &&  y >= std::min(compare1 -> y, compare2 -> y)-epsilon &&
       x <= std::max(reference1 -> x, reference2 -> x)+epsilon &&  x >= std::min(reference1 -> x, reference2 -> x)-epsilon && 
@@ -1499,8 +1657,39 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
   list.add(result_mag);
   list.add(result_angle);
   list.add(mask);
+  list.add(smooth_pressure);
+
+  smooth_pressure.set(0.0);
+
+  // smooth out the pressure
+  for (Points p(*m_grid); p; p.next()) {										
+    const int i = p.i(), j = p.j();
+ //   if(mask.icy(i,j)) {
+
+     int divider = 0;
+     for(int x_counter=0; x_counter<3; x_counter++ ){
+      for(int y_counter=0; y_counter<3; y_counter++ ){ 
+    //   if(mask.icy(i+x_counter-1,j+y_counter-1)) {
+        if( x_counter == 1 && y_counter ==1 ){
+         smooth_pressure(i,j) = smooth_pressure(i,j) + m_Pover_ghosts(i+x_counter-1,j+y_counter-1) * 5.0; /// triple weight the middle point
+         divider = divider + 5;
+        } else {
+         smooth_pressure(i,j) = smooth_pressure(i,j) + m_Pover_ghosts(i+x_counter-1,j+y_counter-1);
+         divider = divider + 1;
+        }
+   //    }
+       
+      }
+     }
 
 
+      smooth_pressure(i,j) = smooth_pressure(i,j) / double(divider);
+
+//    } 
+
+   }
+
+  smooth_pressure.update_ghosts();
   // third order finite difference method for calculating gradient, should give good results (Skidmore, 1989)
   for (Points p(*m_grid); p; p.next()) {										
     const int i = p.i(), j = p.j();
@@ -1509,16 +1698,16 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
     // I think I need to change the gradient calculation
        
 
-    if (mask.icy(i, j) && (m_Pover_ghosts(i+1,j+1) > m_Pover_ghosts(i,j) ||
-       m_Pover_ghosts(i,j+1) > m_Pover_ghosts(i,j) ||
-       m_Pover_ghosts(i-1,j+1) > m_Pover_ghosts(i,j) ||
-       m_Pover_ghosts(i+1,j) > m_Pover_ghosts(i,j) ||
-       m_Pover_ghosts(i-1,j) > m_Pover_ghosts(i,j) ||
-       m_Pover_ghosts(i+1,j-1) > m_Pover_ghosts(i,j) ||
-       m_Pover_ghosts(i,j-1) > m_Pover_ghosts(i,j) ||
-       m_Pover_ghosts(i-1,j-1) > m_Pover_ghosts(i,j))){
-      result(i,j).u = ((m_Pover_ghosts(i+1,j+1) + 2.0 * m_Pover_ghosts(i+1,j) + m_Pover_ghosts(i+1,j-1)) -
-			    (m_Pover_ghosts(i-1,j+1) + 2.0 * m_Pover_ghosts(i-1,j) + m_Pover_ghosts(i-1,j-1))) / (8.0 * dx);
+    if ( (smooth_pressure(i+1,j+1) > smooth_pressure(i,j) ||
+       smooth_pressure(i,j+1) > smooth_pressure(i,j) ||
+       smooth_pressure(i-1,j+1) > smooth_pressure(i,j) ||
+       smooth_pressure(i+1,j) > smooth_pressure(i,j) ||
+       smooth_pressure(i-1,j) > smooth_pressure(i,j) ||
+       smooth_pressure(i+1,j-1) > smooth_pressure(i,j) ||
+       smooth_pressure(i,j-1) > smooth_pressure(i,j) ||
+       smooth_pressure(i-1,j-1) > smooth_pressure(i,j))){
+      result(i,j).u = ((smooth_pressure(i+1,j+1) + 2.0 * smooth_pressure(i+1,j) + smooth_pressure(i+1,j-1)) -
+			    (smooth_pressure(i-1,j+1) + 2.0 * smooth_pressure(i-1,j) + smooth_pressure(i-1,j-1))) / (8.0 * dx);
   //
 /*
       if((i== 30 || i==29) && j==28){
@@ -1528,8 +1717,8 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
       m_log->message(2,"%5i %12.2f %12.2f %12.2f \n",j-1, m_Pover_ghosts(i-1,j-1), m_Pover_ghosts(i,j-1), m_Pover_ghosts(i+1,j-1));
       }
 */
-      result(i,j).v = ((m_Pover_ghosts(i+1,j+1) + 2.0 * m_Pover_ghosts(i,j+1) + m_Pover_ghosts(i-1,j+1)) -
-			    (m_Pover_ghosts(i+1,j-1) + 2.0 * m_Pover_ghosts(i,j-1) + m_Pover_ghosts(i-1,j-1))) / (8.0 * dy);
+      result(i,j).v = ((smooth_pressure(i+1,j+1) + 2.0 * smooth_pressure(i,j+1) + smooth_pressure(i-1,j+1)) -
+			    (smooth_pressure(i+1,j-1) + 2.0 * smooth_pressure(i,j-1) + smooth_pressure(i-1,j-1))) / (8.0 * dy);
 
 //      m_log->message(2,"gradient u and v: %5i %5i %12.2f %12.2f \n", i, j, result(i,j).u, result(i,j).v );
 
@@ -1606,7 +1795,12 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
   //  m_log->message(2,"mag_grad: %5i % 5i %12.2f %12.2f %12.2f %12.2f %12.2f \n", i, j, result_mag(i,j), m_Pover_ghosts(i-1,j), m_Pover_ghosts(i,j+1),  m_Pover_ghosts(i+1,j),  m_Pover_ghosts(i,j-1) );
 //    m_log->message(2,"gradient u and v after black hole: %12.2f %12.2f %12.2f \n", result(i,j).u, result(i,j).v, result_mag(i,j) );
     if(result_mag(i,j) > 0) {
+
+
+
+
       result_angle(i,j) = atan2 (-result(i,j).v,-result(i,j).u);
+  //     m_log->message(2,"%5i %5i %15.10f %15.10f\n",i, j, result_mag(i,j), result_angle(i,j) );
    //   m_log->message(2,"gradient u and v and direction: %5i %5i %15.10f %15.10f %15.10f \n", i, j, result(i,j).u, result(i,j).v, result_angle(i,j) );
    
 
@@ -1623,8 +1817,83 @@ void HydrologyMod::pressure_gradient(IceModelVec2V &result, IceModelVec2S &resul
 
   }
 
+
+/*
+  result_angle.update_ghosts();
+  result_mag.update_ghosts();
+// check to make sure the pressure gradient will not cause irregular polygons
+
+
+  double translate_center[3][3][2];
+  bool check_regular;
+  for (Points p(*m_grid); p; p.next()) {										
+    const int i = p.i(), j = p.j();
+   if(mask.icy(i,j) ) {
+
+
+    node * node1 = new node;
+    node1 -> x = 0.0;
+    node1 -> y = 0.0;
+    node1 -> inside = false;
+
+    node * node2 = new node;
+    node2 -> x = cos(result_angle(i,j));
+    node2 -> y = sin(result_angle(i,j));
+    node2 -> inside = false;
+ 
+    check_regular = false;
+
+    for(int x_counter=0; x_counter<3; x_counter++ ){
+      for(int y_counter=0; y_counter<3; y_counter++ ){ 
+
+       if(result_mag(i+x_counter-1,j+y_counter-1) > 0.0 && mask.icy(i+x_counter-1,j+y_counter-1) && (x_counter != 1 && y_counter != 1) ) {
+        node * node3 = new node;
+        node3 -> x = double(x_counter-1);
+        node3 -> y = double(y_counter-1);
+        node3 -> inside = false;
+
+        node * node4 = new node;
+        node4 -> x = double(x_counter-1) + cos(result_angle(i+x_counter-1,j+y_counter-1)); // translate x
+        node4 -> y = double(y_counter-1) + sin(result_angle(i+x_counter-1,j+y_counter-1)); // translate y
+
+
+
+        bool is_crossover;
+
+        double temp_x, temp_y;
+
+        is_crossover = find_crossover(node1, node2, node3, node4, temp_x, temp_y);
+        if(is_crossover){
+         check_regular = true;
+        }
+
+       }
+
+
+      }  // end for
+    } // end for
+
+    if (check_regular) {
+
+     m_log->message(2,"> %5i %5i \n",i, j );
+     for(int x_counter=0; x_counter<3; x_counter++ ){
+      for(int y_counter=0; y_counter<3; y_counter++ ){ 
+       m_log->message(2,"%5i %5i %15.10f %15.10f %15.10f %15.10f\n",x_counter-1, y_counter-1, result_mag(i+x_counter-1,j+y_counter-1), cos(result_angle(i+x_counter-1,j+y_counter-1)), sin(result_angle(i+x_counter-1,j+y_counter-1)), m_Pover_ghosts(i+x_counter-1,j+y_counter-1) );
+
+       result(i,j).u = 0.0;
+       result(i,j).v = 0.0;
+       result_mag(i,j) = 0.0;
+       result_angle(i,j) = 4.0;
+      }
+     }
+    }
+
+   }
+  }
+*/
   result.update_ghosts();
   result_angle.update_ghosts();
+  result_mag.update_ghosts();
 
   m_log->message(2,"* finished pressure_gradient ...\n");
 
