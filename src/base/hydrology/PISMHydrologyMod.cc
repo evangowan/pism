@@ -621,7 +621,14 @@ void HydrologyMod::update_impl(double t, double dt) {
     quad_area(i,j) = 1.0;
     }
 
-
+    delete node1;
+    delete node2;
+    delete node3;
+    delete node4;
+    node1 = NULL;
+    node2 = NULL;
+    node3 = NULL;
+    node4 = NULL;
 
     // TODO a check to make sure the translated quadralateral is regular? Probably shouldn't happen if the gradient is calculated correctly.
 
@@ -853,20 +860,24 @@ void HydrologyMod::projection_transformation(double transformation[2][2][2],doub
  node1 -> y = transformation[0][0][1];
  node1 -> inside = false;
 
+
  node * node2 = new node;
  node2 -> x = transformation[1][0][0];
  node2 -> y = transformation[1][0][1];
  node2 -> inside = false;
 
+
  node * node3 = new node;
  node3 -> x = transformation[1][1][0];
  node3 -> y = transformation[1][1][1];
-
  node3 -> inside = false;
+
+
  node * node4 = new node;
  node4 -> x = transformation[0][1][0];
  node4 -> y = transformation[0][1][1];
  node4 -> inside = false;
+
 
  bool is_crossover;
 
@@ -890,6 +901,15 @@ void HydrologyMod::projection_transformation(double transformation[2][2][2],doub
   x = 0.5;
   y = 0.5;
  }
+
+ delete node1;
+ delete node2;
+ delete node3;
+ delete node4;
+ node1 = NULL;
+ node2 = NULL;
+ node3 = NULL;
+ node4 = NULL;
 
 }
 
@@ -2073,7 +2093,37 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
    node * p = head;
    node * q = head;
 
-   int check1, check2, counter;
+//   int check1, check2, counter;
+
+   q = head -> next[polygon_number];
+
+   for(int count = 1; count <= listLength[polygon_number]; count++){
+
+    bool delete_node = true;
+
+    if ( polygon_number == 0) {
+     if (q -> next[1] || q -> next[2]){
+      delete_node = false;
+     }
+    } else if (polygon_number == 1) {
+     if (q -> next[2]){
+      delete_node = false;
+     }
+    }
+
+    p = q;
+    q = p -> next[polygon_number];
+
+    if(delete_node) {
+     delete p;
+     p = NULL;
+    } else {
+     p -> next[polygon_number] = NULL;
+    }
+
+   }
+
+/*
    counter = 0;
    bool continue_loop = true;
    while (continue_loop){
@@ -2083,7 +2133,7 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
      p = q;
      q = p -> next[polygon_number];
 
-     if(p -> next[polygon_number]) {
+     if(q) {
       if(polygon_number == 0) {
        check1 = 1;
        check2 = 2;
@@ -2097,12 +2147,15 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
 
       if ( p -> next[check1] == NULL &&  p -> next[check2] == NULL ) { // safe to delete
         delete p;
+        p = NULL;
       } else { // get rid of the pointer
        p -> next[polygon_number] = NULL; 
 
       } // end if
 
      }else{
+      delete p;
+      p = NULL;
       continue_loop = false;
      } // end if
 
@@ -2111,8 +2164,11 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
     } // end if
 
    } // end while
-
+*/
   } // end for
+
+ delete head;
+ head = NULL;
 
  } // end polygon_linked_list::~polygon_linked_list
 
