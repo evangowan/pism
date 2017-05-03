@@ -1376,7 +1376,13 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
          reference.insertNode(overlap_node,overlap_points,2);
        } else {
 
-       end_found = true;
+         if(reference_node -> inside && reference_node->next[2] != NULL) {
+
+             std::cout << "Failure fudge triggered!!!!\n";
+         }
+
+
+        end_found = true;
        }
 
      } else if(compare_node != NULL && compare_node ->next[1] !=NULL && compare_node -> inside && compare_node->next[2] == NULL) {
@@ -1386,6 +1392,11 @@ double HydrologyMod::calculate_water(double reference_cell[4][2], double compare
        overlap_node = compare_node;
        reference.insertNode(overlap_node,overlap_points,2);
       } else {
+
+         if(compare_node -> inside && compare_node->next[2] != NULL) {
+
+             std::cout << "Failure fudge triggered 2!!!!\n";
+         }
 
        end_found = true;
       }
@@ -2082,15 +2093,38 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
    listLength[1] = 0;
    listLength[2] = 0;
 
+   total_nodes = 0;
+
    //  create the head node
    create_node(head);
+
+
 
  }
 
  polygon_linked_list::~polygon_linked_list(){ // destructor
 
 
-  for(int polygon_number = 0; polygon_number<=2; polygon_number++){
+   node * p = head;
+   node * q = head;
+
+  for (int count=1; count <= total_nodes; count++ ) {
+
+   p = q;
+   q = p -> cumulative;
+   delete p;
+
+  }
+
+/*
+  print_polygon(0);
+  print_polygon(1);
+  print_polygon(2);
+
+  for(int polygon_number = 0; polygon_number<=1; polygon_number++){
+
+ //  print_polygon(polygon_number);
+
    node * p = head;
    node * q = head;
 
@@ -2100,31 +2134,52 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
 
    for(int count = 1; count <= listLength[polygon_number]; count++){
 
-    if(q) {
+//     std::cout << polygon_number << ": current node: " << count << " " << q << "\n";
+//    if(q) {
      bool delete_node = true;
 
      if ( polygon_number == 0) {
-      if (q -> next[1] || q -> next[2]){
+      if (q -> next[1] ){
        delete_node = false;
       }
      } else if (polygon_number == 1) {
-      if (q -> next[2]){
-       delete_node = false;
-      }
+    //  if (q -> next[2]){
+   //    delete_node = false;
+   //   }
      }
 
+      if(q == NULL) {
+
+ //      std::cout << "q is NULL!!!1!!! " << q << "\n";
+
+      }
      p = q;
-     if(p -> next[polygon_number]) {
+     if(p -> next[polygon_number] != NULL) {
       q = p -> next[polygon_number];
 
       if(delete_node) {
+//      std::cout << "deleting: " << p << "\n";
+
        delete p;
        p = NULL;
+       total_nodes--;
       } else {
+//      std::cout << "keeping: " << p << " next: " << q << "\n";
        p -> next[polygon_number] = NULL;
       }
+     } else {
+
+      if(polygon_number < 2) {
+//       std::cout << "deleting last node: " << q << "\n";
+       delete q;
+       q = NULL;
+       total_nodes--;
+
+      }
      }
-    }
+ //   }
+
+
 
    }
 
@@ -2169,12 +2224,21 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
     } // end if
 
    } // end while
-*/
+
   } // end for
 
+ std::cout << "deleting: " << head << "\n";
  delete head;
  head = NULL;
+ total_nodes--;
 
+ if(total_nodes > 0) {
+  std::cout << "failed to delete all nodes: " << total_nodes << "\n" ;
+ }
+
+
+  std::cout << "*************************************\n" ;
+*/
  } // end polygon_linked_list::~polygon_linked_list
 
 /*
@@ -2263,14 +2327,29 @@ Function to find a given node for a given polygon (set by polygon_number)
   void polygon_linked_list::create_node(struct node *& node_out){
 
    node_out =  new node;
-
+//   std::cout << "created node: " << node_out << "\n";
    node_out -> x = 0.0;
    node_out -> y = 0.0;
    node_out -> inside = false;
    node_out -> next[0] = NULL;
    node_out -> next[1] = NULL;
    node_out -> next[2] = NULL;
+   node_out -> cumulative = NULL;
    node_out -> shared_node_number = 0;
+
+   total_nodes++;
+
+   if(total_nodes > 1){
+    node * p = head;
+    node * q;
+    for(int counter = 1; counter < total_nodes; counter++){
+     q = p;
+     p = q -> cumulative;
+    }
+
+    q -> cumulative = node_out;
+
+   }
 
  }
 
@@ -2306,9 +2385,9 @@ Function to find a given node for a given polygon (set by polygon_number)
    for(int count = 1; count <= listLength[polygon_number]; count++){
 
     if(q -> inside) {
-     std::cout << q -> x << " " << q ->y << " true " << q -> next[polygon_number] << "\n";
+     std::cout << q -> x << " " << q ->y << " true " << q << " points to " << q -> next[polygon_number] << "\n";
     } else {
-     std::cout << q -> x << " " << q ->y << " false "  << q -> next[polygon_number] <<  "\n";
+     std::cout << q -> x << " " << q ->y << " false " << q << " points to "  << q -> next[polygon_number] <<  "\n";
     }
     q = q -> next[polygon_number];
 

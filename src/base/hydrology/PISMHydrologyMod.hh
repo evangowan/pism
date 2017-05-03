@@ -46,6 +46,8 @@ struct node
     int shared_node_number;
     node * next[3];
 
+    node * cumulative;
+
 };
 
 
@@ -65,6 +67,7 @@ private:
 
    node * head;
    int listLength[3];
+   int total_nodes;
   // int polygon_number;
 };
 
