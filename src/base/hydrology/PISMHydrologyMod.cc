@@ -421,10 +421,10 @@ void HydrologyMod::update_impl(double t, double dt) {
    m_log->message(2,"* till_drainage before: \n");
   // next find the amount of water flow into each cell from adjacent cells with the updated ghosts
   double drainage, drainage_before;
-  double left, right, up, down, topleft, topright, bottomleft, bottomright, center;
-  double res_left, res_right, res_up, res_down;
-  double right_fraction, top_fraction;
-  double area, total_area, distance;
+//  double left, right, up, down, topleft, topright, bottomleft, bottomright, center;
+//  double res_left, res_right, res_up, res_down;
+//  double right_fraction, top_fraction;
+//  double area, total_area, distance;
   double  pi = 3.14159265358979323846;
 
   double translate_center[3][3][2], transformation[2][2][2];
@@ -673,6 +673,7 @@ void HydrologyMod::update_impl(double t, double dt) {
   top_right.update_ghosts();
   bottom_left.update_ghosts();
   bottom_right.update_ghosts();
+   m_log->message(2,"* updated the corners: \n");
   quad_area.update_ghosts();
   
    m_log->message(2,"* after ghost update: \n");
@@ -2099,26 +2100,30 @@ void HydrologyMod::fraction_till(IceModelVec2S &result) const {
 
    for(int count = 1; count <= listLength[polygon_number]; count++){
 
-    bool delete_node = true;
+    if(q) {
+     bool delete_node = true;
 
-    if ( polygon_number == 0) {
-     if (q -> next[1] || q -> next[2]){
-      delete_node = false;
+     if ( polygon_number == 0) {
+      if (q -> next[1] || q -> next[2]){
+       delete_node = false;
+      }
+     } else if (polygon_number == 1) {
+      if (q -> next[2]){
+       delete_node = false;
+      }
      }
-    } else if (polygon_number == 1) {
-     if (q -> next[2]){
-      delete_node = false;
+
+     p = q;
+     if(p -> next[polygon_number]) {
+      q = p -> next[polygon_number];
+
+      if(delete_node) {
+       delete p;
+       p = NULL;
+      } else {
+       p -> next[polygon_number] = NULL;
+      }
      }
-    }
-
-    p = q;
-    q = p -> next[polygon_number];
-
-    if(delete_node) {
-     delete p;
-     p = NULL;
-    } else {
-     p -> next[polygon_number] = NULL;
     }
 
    }
